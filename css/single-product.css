@@ -1,0 +1,565 @@
+
+
+/* Header Styles */
+.header {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
+
+.logo i {
+    font-size: 2rem;
+}
+
+.nav-links {
+    display: flex;
+    gap: 2rem;
+}
+
+.nav-link {
+    color: rgb(211, 22, 22);
+    text-decoration: none;
+    font-weight: 800;
+    transition: all 0.3s ease;
+    padding: 0.5rem 1rem;
+    border-radius: 25px;
+    background-color: whitesmoke;
+}
+
+.nav-link:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+}
+
+/* Loading Spinner */
+.loading-spinner {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: #333;
+    z-index: 2000;
+    display: flex; /* Use flex for centering content within spinner */
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 3px solid rgba(0, 0, 0, 0.2);
+    border-top: 3px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Main Content */
+.main-content-wrapper {
+    padding-top: 100px;
+    min-height: calc(100vh - 100px);
+    display: flex;
+    gap: 3rem;
+    max-width: 1500px;
+    margin: 0 auto;
+    padding-left: 2rem;
+    padding-right: 2rem;
+    padding-bottom: 2rem;
+    align-items: flex-start;
+    animation: fadeInUp 0.8s 0.2s ease-out backwards; /* Existing animation */
+}
+
+/* NEW --- Keyframes for fadeInUp (if not defined elsewhere, or to ensure it's what we expect) */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Left Column for Image and Stickers */
+.product-image-column {
+    /* Adjusted flex properties for width change */
+    /* Conceptual original: 40 parts. New: 40 * 1.15 = 46 parts. Let's use 2.3 for simplicity. */
+    flex-grow: 2.3;
+    flex-shrink: 1;
+    flex-basis: 0%;
+    display: flex; 
+    flex-direction: column;
+}
+
+.product-image-wrapper {
+    position: relative;
+    /* display: inline-block; */ /* MODIFIED */
+    display: block;             /* MODIFIED for width behavior */
+    width: 100%;                /* MODIFIED to fill column */
+    overflow: hidden;           /* ADDED for shine effect clipping */
+    display: flex; /* Added for vertical stacking */
+    flex-direction: column; /* Added for vertical stacking */
+    align-items: center; /* Center items horizontally */
+}
+
+/* ADDED --- Shine/Highlighter effect for product-image-wrapper */
+.product-image-wrapper::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    width: 30%; /* Width of the highlighter beam relative to parent */
+    height: 100%;
+    background: linear-gradient(
+        to right,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.20) 40%, /* Subtle white shine */
+        rgba(255, 255, 255, 0.25) 50%,
+        rgba(255, 255, 255, 0.20) 60%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    transform: skewX(-20deg); /* Angle of the highlighter */
+    z-index: 3; /* Above stickers (z-index: 2) and image container (z-index: 1) */
+    pointer-events: none; /* Highlighter should not interfere with mouse events */
+    animation: shine 7s linear infinite;
+    animation-delay: 0.8s; /* Start after main content fade-in is mostly done */
+    left: -40%; /* Initial position, beam starts off-screen (width 30% + 10% buffer) */
+}
+
+/* ADDED --- Keyframes for shine animation */
+@keyframes shine {
+    0% {
+        left: -40%; /* Beam's leading edge is off-screen left */
+    }
+    100% {
+        left: 110%; /* Beam's leading edge is off-screen right (100% + 10% buffer for its width) */
+    }
+}
+
+.stickers-area {
+    position: relative; /* Changed from absolute */
+    top: auto; /* Changed from 0 */
+    left: auto; /* Changed from 0 */
+    display: flex;
+    gap: 8px;
+    padding: 8px;
+    z-index: 2;
+    margin-left: 50px; /* Adjusted to align with image */
+    margin-bottom: 10px; /* Added space between stickers and image */
+}
+
+.product-sticker {
+    width: 120px;
+    height: 50px;
+    object-fit: cover;
+}
+
+.product-image-container {
+    position: relative;
+    z-index: 1;
+    /* transition: transform 0.3s ease, box-shadow 0.3s ease; /* Existing transition for hover */
+    overflow: hidden; /* Added for zoom containment */
+    display: flex; /* Added for centering */
+    align-items: center; /* Added for vertical centering */
+    justify-content: center; /* Added for horizontal centering */
+    width: 110%; /* 10% more than present size */
+    height: 110%; /* 10% more than present size */
+}
+.duct-image {
+    margin-top: 50px;
+    margin-left: 50px;
+    margin-right: 50px;
+    display: block;
+    max-width: 100%;
+    height: auto;
+    transform-origin: center center; /* Added for zoom */
+    transition: transform 0.2s ease; /* Added for smooth zoom */
+}
+
+.product-image-container:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+}
+
+/* Added for zoom mode */
+.product-image-container.zoom-mode {
+    cursor: zoom-in;
+}
+
+.image-zoom-button {
+    position: absolute;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    background: white;
+    padding: 0.6rem 1.2rem;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: #333;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    z-index: 5;
+    cursor: pointer; /* Added to indicate clickable */
+}
+
+/* Added for active zoom button state */
+.image-zoom-button.active {
+    background: #007bff;
+    color: white;
+}
+
+.product-image-container:hover .image-zoom-button {
+    transform: translateY(-2px);
+}
+
+
+/* Product Details Section (Right Side) */
+.product-details-section {
+    /* flex: 1.2; */ /* MODIFIED - Original value */
+    /* Conceptual original: 60 parts. New: 60 * 0.85 = 51 parts. Let's use 2.55 for simplicity. */
+    flex-grow: 2.55;
+    flex-shrink: 1;
+    flex-basis: 0%;
+    min-width: 0; /* Keep this for flex items */
+    color: white;
+    padding: 2.5rem;
+    background: rgba(80, 160, 240, 0.25);
+    backdrop-filter: blur(20px);
+    border-radius: 25px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+
+    /* ADDED --- Animation: details appear left to right */
+    animation: slideInFromLeft 3s ease-out forwards;
+    animation-delay: 0.2s; /* Align start with parent's fadeInUp animation if desired */
+}
+
+/* ADDED --- Keyframes for product-details-section animation */
+@keyframes slideInFromLeft {
+    0% {
+        transform: translateX(-100%); /* Start fully off-screen to the left */
+        opacity: 0;
+    }
+    100% {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.product-header {
+    margin-bottom: 0.2rem;
+    margin-top: -3.2rem;
+}
+
+.product-title {
+    font-size: 4rem;
+    font-weight: 700;
+    margin-bottom: -0.9rem;
+    line-height: 1.1;
+    color: #3a74f0;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+}
+
+.product-description {
+    font-weight: 600;
+    font-size: 1.5rem;
+    line-height: 1.2;
+    color: #0484c0;
+    margin-bottom: 0.2rem;
+}
+
+.details-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.detail-item {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 1.25rem 1.5rem;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: background 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease; /* Added transform and shadow for JS hover */
+}
+.detail-item:hover { /* Kept existing CSS hover, JS can enhance it */
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.detail-icon {
+    width: 48px;
+    height: 48px;
+    background: rgba(233, 198, 198, 0.2);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: rgb(99, 17, 253);
+    flex-shrink: 0;
+}
+
+.detail-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.detail-label {
+    font-weight: 800;
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+    color: rgb(38, 144, 243);
+}
+
+.detail-value {
+    font-weight: 600;
+    font-size: 1.2rem;
+    color: rgba(0, 0, 0, 0.75);
+    line-height: 1.4;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    margin-top: auto;
+    padding-top: 1rem;
+}
+
+.btn {
+    padding: 0.9rem 1.8rem;
+    border: none;
+    border-radius: 25px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    text-decoration: none;
+    flex-grow: 1;
+}
+
+.btn-primary {
+    background: #FF7F50;
+    color: white;
+    box-shadow: 0 4px 15px rgba(255, 127, 80, 0.3);
+}
+
+.btn-primary:hover {
+    background: #FF6347;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 127, 80, 0.4);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.2);
+    color: rgb(26, 196, 116);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+}
+
+/* Error Message */
+.error-message {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: #333;
+    z-index: 2000;
+    display: flex; /* Use flex for centering content */
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+.error-content {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
+    padding: 3rem;
+    border-radius: 20px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+.error-content i {font-size: 3rem; margin-bottom: 1rem; color: #ffc107;}
+.error-content h2 { margin-bottom: 1rem; font-size: 2rem;}
+.error-content p {margin-bottom: 2rem; opacity: 0.8;}
+.error-content .btn-primary {
+    background: #007bff; color: white; 
+    box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+}
+.error-content .btn-primary:hover {
+    background: #0056b3;
+    box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
+}
+
+
+/* Modal */
+.modal {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 3000;
+}
+.modal-content {position: relative; max-width: 90%; max-height: 90%;}
+.close-modal {
+    position: absolute; top: -35px; right: -5px;
+    color: white; font-size: 2.5rem; cursor: pointer; padding: 0.5rem;
+    transition: color 0.3s ease;
+}
+.close-modal:hover { color: #ccc; }
+.modal-content img {max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 10px;}
+
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .main-content-wrapper {
+        flex-direction: column;
+        align-items: center;
+        gap: 2rem;
+    }
+    .product-image-column,
+    .product-details-section {
+        flex-grow: 1; /* Allow them to take full width when stacked */
+        flex-basis: auto; /* Reset basis */
+        width: 100%;
+        max-width: 600px;
+    }
+    .product-image-column {
+        align-items: center;
+    }
+    /* Shine effect might need adjustment on smaller screens if it looks too dominant */
+    .product-image-wrapper::after {
+        width: 40%; /* Slightly wider shine on smaller parent */
+        left: -50%;
+    }
+    @keyframes shine { /* Adjust keyframes if needed for responsiveness */
+        0% { left: -50%;}
+        100% { left: 110%;}
+    }
+
+    .stickers-area {
+        /* margin-top: 15px; /* This might be redundant if product-image margin-top is adjusted */
+        align-self: center;
+        margin-bottom: 1rem;
+    }
+    .product-image-container {
+        max-width: 150%;
+        height: auto;
+        aspect-ratio: 4/3;
+    }
+    .product-details-section {
+        padding: 2rem;
+        /* Reset animation if it causes layout issues on stack, or ensure it behaves well */
+        /* animation: none; /* Example: disable animation on smaller screens if problematic */
+    }
+    .product-title {
+        font-size: 2rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .header { padding: 0.8rem 1rem; }
+    .logo span { display: none; }
+    .nav-links { display: none; }
+
+    .main-content-wrapper {
+        padding-left: 1rem;
+        padding-right: 1rem;
+        padding-top: 80px;
+    }
+    .product-image-column,
+    .product-details-section {
+        max-width: 100%;
+    }
+    .product-title { font-size: 2.5rem; }
+    .product-description { font-size: 1rem; }
+    .detail-item { padding: 1rem; gap: 1rem;}
+    .detail-icon { width: 40px; height: 40px; font-size: 1rem;}
+    .detail-label { font-size: 0.9rem;}
+    .detail-value { font-size: 0.8rem;}
+    .btn { padding: 0.8rem 1.5rem; font-size: 0.9rem;}
+    .action-buttons {
+        flex-direction: column;
+    }
+    /* Further adjustments for shine effect on mobile if needed */
+    .product-image-wrapper::after {
+        width: 50%; 
+        left: -60%;
+        animation-delay: 1s; /* Ensure content is visible before shine */
+    }
+    @keyframes shine {
+        0% { left: -60%;}
+        100% { left: 110%;}
+    }
+}
+
+.supplier-area {
+    position: relative;
+}
+
+.supplier-logo {
+    position: relative;
+    z-index: 2; /* Bring logo to front */
+}
+
+.supplier-message {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1; /* Behind the logo */
+    width: 100%;
+    padding: 10px;
+    color: #e90f0f;
+    background: rgba(0, 0, 0, 0.5); /* Optional background for visibility */
+}
+
+
+.supplier-logo {
+    margin-top: 50px;
+    width: auto;
+    height: auto;
+    margin-bottom: 20px;
+}
+
+

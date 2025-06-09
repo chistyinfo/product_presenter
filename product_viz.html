@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Visualization - Fullscreen Mode</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Reset and Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #000;
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+        
+        /* Fullscreen Visualization Container */
+        .fullscreen-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        /* Background Image */
+        .background-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            transition: opacity 0.5s ease;
+        }
+        
+        .background-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        /* Product Image */
+        .product-container {
+            position: absolute;
+            z-index: 2;
+            transition: all 0.3s ease;
+            /* Positioning will be set dynamically via JS */
+        }
+        
+        .product-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        
+        /* Controls */
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 10;
+            background-color: rgba(0, 0, 0, 0.6);
+            padding: 10px 20px;
+            border-radius: 30px;
+            backdrop-filter: blur(5px);
+            transition: opacity 0.3s ease;
+        }
+        
+        .controls.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .control-button {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s ease;
+        }
+        
+        .control-button:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        /* Background Selector */
+        .background-selector {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 10;
+            background-color: rgba(0, 0, 0, 0.6);
+            padding: 10px;
+            border-radius: 10px;
+            backdrop-filter: blur(5px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        
+        .background-selector.hidden {
+            opacity: 0;
+            transform: translateX(100%);
+            pointer-events: none;
+        }
+        
+        .background-option {
+            width: 80px;
+            height: 60px;
+            margin: 5px;
+            border: 2px solid transparent;
+            border-radius: 5px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: border-color 0.2s ease;
+        }
+        
+        .background-option.active {
+            border-color: #4CAF50;
+        }
+        
+        .background-option img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        /* Product Info */
+        .product-info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+            background-color: rgba(0, 0, 0, 0.6);
+            padding: 15px;
+            border-radius: 10px;
+            max-width: 300px;
+            backdrop-filter: blur(5px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        
+        .product-info.hidden {
+            opacity: 0;
+            transform: translateY(-20px);
+            pointer-events: none;
+        }
+        
+        .product-name {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .product-description {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Error Message */
+        .error-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 400px;
+            z-index: 101;
+        }
+        
+        .error-message i {
+            font-size: 3rem;
+            color: #ff5252;
+            margin-bottom: 15px;
+        }
+        
+        .error-message h2 {
+            margin-bottom: 10px;
+        }
+        
+        .error-message p {
+            margin-bottom: 20px;
+            opacity: 0.8;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s ease;
+        }
+        
+        .btn-primary {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #45a049;
+        }
+        
+        /* Responsive Adjustments */
+        @media (max-width: 768px) {
+            .controls {
+                bottom: 10px;
+                padding: 8px 15px;
+            }
+            
+            .control-button {
+                width: 35px;
+                height: 35px;
+                font-size: 1rem;
+            }
+            
+            .background-selector {
+                top: 10px;
+                right: 10px;
+            }
+            
+            .background-option {
+                width: 60px;
+                height: 45px;
+            }
+            
+            .product-info {
+                top: 10px;
+                left: 10px;
+                padding: 10px;
+                max-width: 250px;
+            }
+            
+            .product-name {
+                font-size: 1.2rem;
+            }
+            
+            .product-description {
+                font-size: 0.8rem;
+            }
+        }
+        
+        /* Auto-hide UI elements when inactive */
+        .auto-hide {
+            opacity: 1;
+            transition: opacity 0.5s ease;
+        }
+        
+        .fullscreen-container:not(:hover) .auto-hide {
+            opacity: 0;
+        }
+        
+        .fullscreen-container:hover .auto-hide {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <p>Loading product visualization...</p>
+    </div>
+    
+    <!-- Error Message (hidden by default) -->
+    <div id="error-message" class="error-message" style="display: none;">
+        <i class="fas fa-exclamation-triangle"></i>
+        <h2>Error Loading Product</h2>
+        <p>The requested product could not be loaded. Please try again later.</p>
+        <button class="btn btn-primary" onclick="window.history.back()">Go Back</button>
+    </div>
+    
+    <!-- Fullscreen Visualization Container -->
+    <div id="fullscreen-container" class="fullscreen-container" style="display: none;">
+        <!-- Background Container -->
+        <div id="background-container" class="background-container">
+            <!-- Background image will be inserted here -->
+        </div>
+        
+        <!-- Visualization Marking Area -->
+        <div id="viz-marking-area">
+            <!-- Product Container -->
+            <div id="product-container" class="product-container">
+                <!-- Product image will be inserted here -->
+            </div>
+        </div>
+        
+        <!-- Product Info -->
+        <div id="product-info" class="product-info auto-hide">
+            <div id="product-name" class="product-name">Product Name</div>
+            <div id="product-description" class="product-description">Product description goes here.</div>
+        </div>
+        
+        <!-- Background Selector -->
+        <div id="background-selector" class="background-selector auto-hide">
+            <!-- Background thumbnails will be inserted here -->
+        </div>
+        
+        <!-- Controls -->
+        <div id="controls" class="controls auto-hide">
+            <button id="exit-button" class="control-button" title="Exit Fullscreen">
+                <i class="fas fa-times"></i>
+            </button>
+            <button id="info-toggle" class="control-button" title="Toggle Product Info">
+                <i class="fas fa-info-circle"></i>
+            </button>
+            <button id="backgrounds-toggle" class="control-button" title="Toggle Background Selection">
+                <i class="fas fa-images"></i>
+            </button>
+            <button id="fullscreen-toggle" class="control-button" title="Toggle Fullscreen">
+                <i class="fas fa-expand"></i>
+            </button>
+        </div>
+    </div>
+    
+    <script src="js/product_viz.js"></script>
+</body>
+</html>

@@ -1,0 +1,564 @@
+/* GENERAL STYLES & CSS VARIABLES */
+:root {
+    --bg-main: #f0f2f5;
+    --bg-panel: #ffffff;
+    --bg-header: #ffffff;
+    --bg-scene: #e1e4e8;
+    --border-color: #d1d5db;
+    --text-primary: #1f2937;
+    --text-secondary: #6b7280;
+    --accent-primary: #3b82f6;
+    --accent-primary-hover: #2563eb;
+    --accent-secondary: #10b981;
+    --accent-secondary-hover: #059669;
+    --danger-color: #ef4444;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden; /* This is key for the no-scroll layout */
+    font-family: var(--font-sans);
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+/* MAIN APP LAYOUT */
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.app-header {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    height: 60px;
+    background-color: var(--bg-header);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    z-index: 100;
+}
+
+.app-content {
+    flex-grow: 1;
+    display: flex;
+    overflow: hidden; /* Prevents panels from causing scroll */
+}
+
+/* HEADER STYLES */
+.app-header .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 1.2em;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.app-header .logo i {
+    color: var(--accent-primary);
+}
+.app-header h1 { margin: 0; font-size: inherit; }
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+#fullscreen-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background-color: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+#fullscreen-toggle:hover {
+    background-color: #f9fafb;
+    color: var(--text-primary);
+    border-color: #9ca3af;
+}
+.button-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background-color: var(--accent-secondary);
+    color: white;
+    text-decoration: none;
+    border: none;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: background-color 0.2s ease;
+}
+.button-link:hover {
+    background-color: var(--accent-secondary-hover);
+}
+
+/* THREE-PANEL LAYOUT */
+.panel {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-panel);
+}
+
+.left-panel, .right-panel {
+    flex-basis: 280px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border-color);
+    padding: 16px;
+    gap: 24px;
+}
+.right-panel {
+    border-right: none;
+    border-left: 1px solid var(--border-color);
+}
+.center-panel {
+    flex-grow: 1;
+    padding: 24px;
+    background-color: var(--bg-main);
+    justify-content: center;
+    align-items: center;
+}
+
+/* LEFT PANEL: ASSETS */
+.panel-section {
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* Important for flex child with overflow */
+}
+.panel-section:first-child { flex: 4; } /* Give more space to backgrounds */
+.panel-section:last-child { flex: 6; } /* And products */
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+.panel-header h2 {
+    margin: 0;
+    font-size: 1em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+}
+
+.action-button-sm {
+    padding: 4px 10px;
+    font-size: 12px;
+    border-radius: 5px;
+    border: 1px solid var(--border-color);
+    background-color: #f9fafb;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.action-button-sm:hover {
+    background-color: #f3f4f6;
+    color: var(--text-primary);
+}
+
+.thumbnails-container {
+    flex-grow: 1;
+    overflow-y: auto;
+    background-color: #f9fafb;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px;
+}
+#background-thumbnails, #product-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    row-gap: 0; /* Remove vertical gap */
+    column-gap: 8px; /* Keep horizontal gap */
+}
+.background-thumbnail, .product-thumbnail-container {
+    position: relative;
+    aspect-ratio: 16/10;
+    border-radius: 4px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+.background-thumbnail:hover, .product-thumbnail-container:hover {
+    border-color: #bfdbfe;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+}
+.background-thumbnail.selected, .product-thumbnail-container.selected {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4);
+}
+.background-thumbnail img, .product-thumbnail {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.delete-btn {
+    position: absolute;
+    top: 4px; right: 4px;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+.background-thumbnail:hover .delete-btn, .product-thumbnail-container:hover .delete-btn { opacity: 1; }
+.delete-btn:hover { background: var(--danger-color); }
+
+
+/* CENTER PANEL: VISUALIZER */
+#presentation-wrapper {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.scene-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16/9;
+    background-color: var(--bg-scene);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-md);
+    overflow: hidden; /* Hides rulers overflow */
+    /* REMOVED padding-top and padding-left to fix extra space */
+}
+#scene-background {
+    display: block; 
+    width: 100%; 
+    height: 100%; 
+    object-fit: cover;
+    object-position: center;
+    color: var(--text-secondary);
+    text-align: center;
+    font-size: 1.2em;
+    padding: 0;
+}
+.marking-area {
+    position: absolute; border: 2px solid var(--danger-color);
+    background-color: rgba(239, 68, 68, 0.2);
+    z-index: 10; cursor: move; box-sizing: border-box;
+}
+/* Other scene elements like rulers, inserted-product, etc. inherit from your original CSS, which is fine */
+
+/* RIGHT PANEL: INSPECTOR */
+.marking-controls h3 {
+    margin: 0 0 16px 0;
+    font-size: 1.1em;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-primary);
+}
+.control-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.control-group.full-width {
+    grid-column: 1 / -1;
+}
+.control-group label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+.control-group input[type="number"] {
+    width: 100%;
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid var(--border-color);
+    background-color: #f9fafb;
+    font-size: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.control-group input[type="number"]:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+.measurement-display {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    background-color: #f3f4f6;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+.measurement-display strong {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+.action-button {
+    width: 100%;
+    padding: 12px;
+    cursor: pointer;
+    border: none;
+    background-color: var(--accent-primary);
+    color: #fff;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background-color 0.2s;
+}
+.action-button:hover {
+    background-color: var(--accent-primary-hover);
+}
+
+/* FULLSCREEN MODE STYLES */
+body.fullscreen-active { background-color: #000; }
+body.fullscreen-active .app-header,
+body.fullscreen-active .left-panel,
+body.fullscreen-active .right-panel,
+body.fullscreen-active .ruler {
+    display: none;
+}
+/* FIXED: Separated marking-area rule and added !important to ensure it's hidden */
+body.fullscreen-active .marking-area {
+    display: none !important;
+}
+
+body.fullscreen-active .app-content {
+    padding: 0;
+}
+body.fullscreen-active .center-panel {
+    padding: 0;
+    background-color: transparent;
+}
+body.fullscreen-active .scene-container {
+    width: 100vw;
+    height: 100vh;
+    border: none;
+    box-shadow: none;
+    padding: 0; /* Remove ruler padding */
+}
+body.fullscreen-active .scene-content-wrapper {
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+}
+#exit-fullscreen-btn {
+    position: fixed; top: 15px; right: 15px;
+    background: rgba(0,0,0,0.4); color: white; border: none;
+    border-radius: 50%; width: 44px; height: 44px;
+    font-size: 1.5em; cursor: pointer; display: none;
+    align-items: center; justify-content: center;
+    z-index: 1001; transition: background-color 0.2s ease;
+}
+#exit-fullscreen-btn:hover { background: rgba(0,0,0,0.7); }
+body.fullscreen-active #exit-fullscreen-btn { display: flex; }
+
+/* Keep your existing styles for modals, rulers, fullscreen controls, etc. */
+/* They are mostly fine and will work with the new layout. */
+/* I've included some minor adjustments for modals below. */
+
+.modal {
+    display: none; position: fixed; z-index: 1000; left: 0; top: 0;
+    width: 100%; height: 100%; overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+    display: none; align-items: center; justify-content: center;
+}
+/* Use JS to change display from 'none' to 'flex' to show modal */
+.modal-content {
+    background-color: #fefefe; margin: 0; padding: 24px 30px;
+    border-radius: 8px; box-shadow: var(--shadow-md);
+    width: 90%; max-width: 500px;
+}
+.modal-content h3 { display: flex; align-items: center; gap: 10px; margin-top: 0;}
+.close-modal {
+    color: #aaa; float: right; font-size: 28px; font-weight: bold;
+    cursor: pointer; line-height: 1;
+}
+.close-modal:hover { color: black; }
+.modal-buttons { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+.modal-buttons .action-button, .modal-buttons .action-button.secondary { width: auto; height: 25px}
+.action-button.secondary { background-color: #21ad3f; margin-top: 10px;}
+.action-button.secondary:hover { background-color: #5a6268; }
+#background-name {
+    width: 100%; padding: 10px; margin: 10px 0; border: 1px solid var(--border-color);
+    border-radius: 6px; font-size: 1em;
+}
+
+/* Include original ruler and fullscreen control styles here if they are not in a separate file */
+/* The provided original CSS for these components is largely compatible. */
+.ruler{position:absolute;background-color:#f0f0f0;border:1px solid #ccc;box-sizing:border-box;overflow:hidden;z-index:5;font-size:10px;color:#333;line-height:20px}.ruler-h{top:0;left:20px;right:0;height:20px;border-bottom:1px solid #ccc;border-left:none}.ruler-v{top:20px;left:0;bottom:0;width:20px;border-right:1px solid #ccc;border-top:none;text-align:center}.ruler-tick{position:absolute;background-color:#999}.ruler-h .ruler-tick{bottom:0;width:1px}.ruler-v .ruler-tick{right:0;height:1px}.ruler-tick.major{background-color:#333}.ruler-h .ruler-tick.major{height:10px}.ruler-h .ruler-tick.medium{height:6px}.ruler-h .ruler-tick.minor{height:3px}.ruler-v .ruler-tick.major{width:10px}.ruler-v .ruler-tick.medium{width:6px}.ruler-v .ruler-tick.minor{width:3px}.ruler-label{position:absolute;font-size:10px;color:#333;user-select:none}.ruler-h .ruler-label{bottom:1px;line-height:1;transform:translateX(-50%)}.ruler-v .ruler-label{right:1px;line-height:1;transform:translateY(-50%) rotate(-90deg);transform-origin:right center;white-space:nowrap}.scene-content-wrapper {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    width: calc(100% - 20px);
+    height: calc(100% - 20px);
+    overflow: hidden;
+}
+.fullscreen-controls{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:50;opacity:0;transition:opacity .3s ease;display:none}body.fullscreen-active .fullscreen-controls{display:block}.scene-content-wrapper:hover .fullscreen-controls{opacity:1}.nav-button{position:absolute;top:50%;transform:translateY(-50%);background-color:rgba(0,0,0,.5);color:#fff;border:none;border-radius:50%;width:50px;height:50px;font-size:1.5em;cursor:pointer;pointer-events:auto;transition:background-color .2s ease,transform .2s ease;display:flex;align-items:center;justify-content:center}.nav-button:hover{background-color:rgba(0,0,0,.8);transform:translateY(-50%) scale(1.1)}.nav-button.left{left:20px}.nav-button.right{right:20px}.fullscreen-toolbar{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:15px;background-color:rgba(0,0,0,.5);padding:10px 15px;border-radius:30px;pointer-events:auto}.toolbar-button{background:0 0;border:none;color:#fff;font-size:1.2em;cursor:pointer;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background-color .2s ease,transform .2s ease}.toolbar-button:hover{background-color:rgba(255,255,255,.2);transform:scale(1.1)}.toolbar-button.active{background-color:rgba(255,255,255,.3)}.product-info-overlay{position:absolute;bottom:0;left:0;width:100%;background-color:rgba(0,0,0,.7);color:#fff;padding:15px 20px;box-sizing:border-box;transform:translateY(100%);transition:transform .3s ease;z-index:60;display:none}.product-info-overlay.visible{transform:translateY(0)}body.fullscreen-active .product-info-overlay{display:block}.product-info-overlay h3{margin-top:0;margin-bottom:5px;color:#fff;text-align:left}.product-info-overlay p{margin:0}
+/*Resize handles need to be visible in the new right panel color scheme*/.resize-handle{position:absolute;width:10px;height:10px;background-color:white;border:1px solid var(--danger-color);pointer-events:auto}.resize-handle.n{top:-5px;left:50%;transform:translateX(-50%);cursor:n-resize}.resize-handle.ne{top:-5px;right:-5px;cursor:ne-resize}.resize-handle.e{top:50%;right:-5px;transform:translateY(-50%);cursor:e-resize}.resize-handle.se{bottom:-5px;right:-5px;cursor:se-resize}.resize-handle.s{bottom:-5px;left:50%;transform:translateX(-50%);cursor:s-resize}.resize-handle.sw{bottom:-5px;left:-5px;cursor:sw-resize}.resize-handle.w{top:50%;left:-5px;transform:translateY(-50%);cursor:w-resize}.resize-handle.nw{top:-5px;left:-5px;cursor:nw-resize}
+#inserted-product{position:absolute;object-fit:cover;z-index:5}
+
+/* PRODUCT DETAIL MODAL STYLES */
+.product-detail-modal-content {
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background-color: #f9fafb;
+    font-size: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="number"]:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    background-color: white;
+}
+
+.form-group input[type="file"] {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background-color: #f9fafb;
+    font-size: 14px;
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* Autocomplete styles for product detail modal */
+.autocomplete-container {
+    position: relative;
+}
+
+.autocomplete-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+    box-shadow: var(--shadow-md);
+}
+
+.autocomplete-suggestion {
+    padding: 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+    transition: background-color 0.2s;
+}
+
+.autocomplete-suggestion:hover,
+.autocomplete-suggestion.highlighted {
+    background-color: #f3f4f6;
+}
+
+.autocomplete-suggestion:last-child {
+    border-bottom: none;
+}
+
+.suggestion-id {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.suggestion-name {
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin-top: 2px;
+}
+
+/* Message styles for product detail modal */
+.message {
+    padding: 12px 16px;
+    border-radius: 6px;
+    text-align: center;
+    font-size: 14px;
+    margin-top: 16px;
+}
+
+.message.success {
+    background-color: #d1fae5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+}
+
+.message.error {
+    background-color: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+

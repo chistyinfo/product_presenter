@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product List - Product Visualizer</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/product-list.css">
+</head>
+<body>
+    <div class="page-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-cube"></i>
+                <span>ProductViz</span>
+            </div>
+            <nav class="nav-links">
+                <a href="#" class="nav-link">Home</a>
+                <a href="#" class="nav-link active">Products</a>
+                <a href="#" class="nav-link">About</a>
+            </nav>
+        </header>
+
+        <!-- Loading Spinner -->
+        <div id="loading-spinner" class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Loading products...</p>
+        </div>
+
+        <!-- Main Content -->
+        <main class="main-content" id="main-content" style="display: none;">
+            <div class="product-list-container">
+                <div class="search-section">
+                    <h1 class="section-title">Products</h1>
+                    <div class="search-container">
+                        <input type="text" id="product-search" placeholder="Search products by name..." class="search-input">
+                        <button id="search-button" class="search-button">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="product-list" id="product-list">
+                    <!-- Products will be loaded dynamically -->
+                    <div class="product-item">
+                        <div class="product-image-container">
+                            <img src="https://via.placeholder.com/100" alt="Product" class="product-thumbnail">
+                        </div>
+                        <div class="product-info">
+                            <h3 class="product-name">306</h3>
+                            <p class="product-description">কোরিয়ান প্রযুক্তিতে তৈরি</p>
+                        </div>
+                        <div class="product-action">
+                            <button class="view-details-btn">
+                                <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="product-item">
+                        <div class="product-image-container">
+                            <img src="https://via.placeholder.com/100" alt="Product" class="product-thumbnail">
+                        </div>
+                        <div class="product-info">
+                            <h3 class="product-name">218</h3>
+                            <p class="product-description">Professional Series</p>
+                        </div>
+                        <div class="product-action">
+                            <button class="view-details-btn">
+                                <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="no-results" class="no-results" style="display: none;">
+                    <i class="fas fa-search"></i>
+                    <p>No products found matching your search.</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Error Message -->
+        <div id="error-message" class="error-message" style="display: none;">
+            <div class="error-content">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h2>Error Loading Products</h2>
+                <p>Unable to load the product list. Please try again later.</p>
+                <button class="btn btn-primary" onclick="location.reload()">Retry</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/product_list.js"></script>
+</body>
+</html>

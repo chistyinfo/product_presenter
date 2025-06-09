@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Product Details - Product Visualizer</title>
+        <link rel="stylesheet" href="css/single-product.css">
+        <link rel="stylesheet" href="css/product-search.css">
+        <link rel="stylesheet" href="css/product_search_styles.css">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <style>
+            /* Logo Animation Overlay Styles */
+            #logo-animation-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(243, 234, 234, 0.9);
+                z-index: 9999;
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                justify-content: center; /* Center vertically */
+                align-items: center; /* Center horizontally */
+            }
+            
+            .logo-container {
+                position: relative;
+                width: 100%; /* Reverted back to original 100% */
+                height: 100%;
+                overflow: hidden;
+                z-index: 1; /* Place behind the supplier area */
+            }
+            
+            .floating-logo {
+                position: absolute;
+                width: 150px;
+                height: 75px;
+                opacity: 0.8;
+                transition: opacity 0.3s;
+            }
+            
+            .floating-logo:hover {
+                opacity: 1;
+            }
+            
+            .supplier-area {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 700px; /* Added width that's double the implied width from padding */
+                background-color: rgba(0, 0, 0, 0.7);
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                padding: 30px 50px;
+                border-radius: 20px;
+                box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+                z-index: 2; /* Place above the floating logos */
+            }
+            
+            .supplier-logo {
+                width: 250px;
+                margin-bottom: 5px;
+            }
+            
+            .supplier-message {
+                color: white;
+                font-size: 30px;
+                font-weight: 600;
+                text-align: center;
+                font-family: 'Inter', sans-serif;
+                opacity: 0;
+                transform: translateY(20px);
+                transition: opacity 0.5s, transform 0.5s;
+            }
+            
+            .supplier-message.active {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            
+            /* Click anywhere text */
+            .click-instruction {
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                color: rgba(255, 255, 255, 0.7);
+                font-size: 14px;
+                font-family: 'Inter', sans-serif;
+                padding: 8px 12px;
+                border-radius: 4px;
+                background-color: rgba(255, 255, 255, 0.1);
+                cursor: pointer;
+                z-index: 3; /* Place above everything */
+            }
+            
+            /* Hide scrollbar when overlay is active */
+            body.overlay-active {
+                overflow: hidden;
+            }
+        </style>
+    </head>
+
+    <!--
+    └── product_presenter/                 
+      ├── individual-product.html
+      ├── js/
+      │   ├── product_viewer.js 
+          ├── product_search.js
+      
+      ├── list_products.php
+    
+      └── css/
+          └── single-product.css  --> 
+    
+<body>
+    <!-- Logo Animation Overlay -->
+    <div id="logo-animation-overlay" style="display: none;">
+        <div class="logo-container" id="logo-container">
+            <!-- Logos will be added dynamically via JavaScript -->
+        </div>
+        <div class="supplier-area">
+            <img src="uploads/stickers/logo.svg" alt="BDM Logo" class="supplier-logo">
+            <div class="supplier-message active" id="supplier-message">Open the door of trust with us</div>
+        </div>
+        <div class="click-instruction">Click anywhere to continue</div>
+    </div>
+
+    <div class="page-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-cube"></i>
+                <span>ProductViz</span>
+            </div>
+            <nav class="nav-links">
+                <a href="http://localhost/product_presenter/" class="nav-link">Setting</a>
+            </nav>
+        </header>
+
+        <!-- Loading Spinner -->
+        <div id="loading-spinner" class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Loading product details...</p>
+        </div>
+
+        <!-- Main Content -->
+        <main class="main-content-wrapper" id="main-content" style="display: none;">
+            <!-- Left Column Item -->
+            <div class="product-image-column">
+                <div class="product-image-wrapper"> <!-- New wrapper for relative positioning -->
+                    <div class="stickers-area" id="stickers-container">
+                        <!-- Stickers will be loaded dynamically by product_viewer.js -->
+                    </div>
+                    <div class="product-image-container" onclick="openImageModal()">
+                        <img id="product-image" src="https://www.transparentpng.com/thumb/door/YsIg91-wooden-door-transparent-background.png" alt="Product Image" class="product-image">
+                        <div class="image-zoom-button">
+                            <i class="fas fa-search-plus"></i>
+                            <span>Click to zoom</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+
+            <!-- Product Details Section (Right Column Item) -->
+            <div class="product-details-section">
+                <div class="product-header">
+                    <h1 id="product-name" class="product-title">306</h1>
+                    <p id="product-description" class="product-description">Heat Observe Capability Korian Technology</p>
+                </div>
+
+                <div class="details-list" id="details-grid">
+                    <!-- Details will be loaded dynamically -->
+                    <div class="detail-item">
+                        <div class="detail-icon"><i class="fas fa-cog"></i></div>
+                        <div class="detail-content">
+                            <span class="detail-label">Technology</span>
+                            <span class="detail-value">Heat Observe Capability with Korian Technology</span>
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-icon"><i class="fas fa-star"></i></div>
+                        <div class="detail-content">
+                            <span class="detail-label">Smart Detection</span>
+                            <span class="detail-value">Advanced thermal sensing with real-time monitoring</span>
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-icon"><i class="fas fa-ruler-combined"></i></div>
+                        <div class="detail-content">
+                            <span class="detail-label">Size</span>
+                            <span class="detail-value">15.2 x 8.4 x 3.1 inches</span>
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-icon"><i class="fas fa-shield-alt"></i></div>
+                        <div class="detail-content">
+                            <span class="detail-label">Build Quality</span>
+                            <span class="detail-value">Premium aluminum alloy with reinforced components</span>
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-icon"><i class="fas fa-headset"></i></div> <!-- Changed icon for Coverage -->
+                        <div class="detail-content">
+                            <span class="detail-label">Coverage</span>
+                            <span class="detail-value">2-year international warranty with 24/7 support</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="shareProduct()">
+                        <i class="fas fa-share-alt"></i>
+                        Share Product
+                    </button>
+                    <button class="btn btn-secondary" onclick="redirectToProductViz()">
+                        <i class="fas fa-eye"></i>
+                        Product Viz
+                    </button>
+                </div>
+                <!-- Scene Info Removed -->
+            </div>
+        </main>
+
+        <!-- Error Message -->
+        <div id="error-message" class="error-message" style="display: none;">
+            <div class="error-content">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h2>Product Not Found</h2>
+                <p>The requested product could not be found or loaded.</p>
+                <button class="btn btn-primary" onclick="window.history.back()">Go Back</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Modal -->
+    <div id="image-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeImageModal()">×</span>
+            <img id="modal-image" src="" alt="Product Image">
+        </div>
+    </div>
+    <script src="js/product_viewer.js"></script>
+    <script src="js/product_search.js"></script>
+    <script>
+        // Logo Animation Overlay Script
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if this is the first visit to the page in this session
+            const isFirstVisit = !sessionStorage.getItem('hasVisitedProductPage');
+            const overlay = document.getElementById('logo-animation-overlay');
+            
+            // Only show overlay on first visit
+            if (isFirstVisit) {
+                // Mark that user has visited the page
+                sessionStorage.setItem('hasVisitedProductPage', 'true');
+                
+                // Show the overlay
+                showOverlay();
+            }
+            
+            // Function to show overlay and hide scrollbar
+            function showOverlay() {
+                overlay.style.display = 'flex';
+                document.body.classList.add('overlay-active');
+                initializeOverlay();
+            }
+            
+            // Function to hide overlay and restore scrollbar
+            function hideOverlay() {
+                overlay.style.display = 'none';
+                document.body.classList.remove('overlay-active');
+            }
+            
+            // Function to initialize the overlay content and behavior
+            function initializeOverlay() {
+                // Logo paths
+                const logoPaths = [
+                    'assets/logo/metador.svg',
+                    'assets/logo/mostafa.png',
+                    'assets/logo/lira.png',
+                    'assets/logo/akij.png',
+                    'assets/logo/alibaba.png',
+                    'assets/logo/crystal.svg',
+                    'assets/logo/hatim.png',
+                    'assets/logo/n.mohammad.png',
+                    'assets/logo/noor.png',
+                    'assets/logo/npoly.png',
+                    'assets/logo/royal.png',
+                    'assets/logo/rfl.png',
+                    'assets/logo/aziz.png',
+                    'assets/logo/alibaba.png',
+                    'assets/logo/metador.svg',
+                    'assets/logo/mostafa.png',
+                    'assets/logo/lira.png',
+                    'assets/logo/akij.png',
+                    'assets/logo/alibaba.png',
+                    'assets/logo/crystal.svg',
+                    'assets/logo/hatim.png',
+                    'assets/logo/n.mohammad.png',
+                    'assets/logo/noor.png',
+                    'assets/logo/npoly.png',
+                    'assets/logo/royal.png',
+                    'assets/logo/rfl.png',
+                    'assets/logo/aziz.png',
+                    'assets/logo/alibaba.png'
+                ];
+                
+                const logoContainer = document.getElementById('logo-container');
+                const supplierMessage = document.getElementById('supplier-message');
+                
+                // Clear any existing logos
+                logoContainer.innerHTML = '';
+                
+                // Create and position logos
+                logoPaths.forEach((path, index) => {
+                    const logo = document.createElement('img');
+                    logo.src = path;
+                    logo.alt = 'Brand Logo';
+                    logo.className = 'floating-logo';
+                    
+                    // Random initial position
+                    const randomX = Math.random() * (window.innerWidth - 150);
+                    const randomY = Math.random() * (window.innerHeight - 75);
+                    
+                    logo.style.left = `${randomX}px`;
+                    logo.style.top = `${randomY}px`;
+                    
+                    // Add animation with random parameters
+                    const duration = 15 + Math.random() * 20; // 15-35 seconds
+                    const delay = Math.random() * 5; // 0-5 seconds delay
+                    
+                    logo.style.animation = `float ${duration}s linear ${delay}s infinite`;
+                    
+                    logoContainer.appendChild(logo);
+                });
+                
+                // Add floating animation keyframes if not already added
+                if (!document.getElementById('float-animation-keyframes')) {
+                    const styleSheet = document.createElement('style');
+                    styleSheet.id = 'float-animation-keyframes';
+                    styleSheet.type = 'text/css';
+                    styleSheet.innerHTML = `
+                        @keyframes float {
+                            0% {
+                                transform: translate(0, 0) rotate(0deg);
+                            }
+                            25% {
+                                transform: translate(100px, 50px) rotate(5deg);
+                            }
+                            50% {
+                                transform: translate(50px, 100px) rotate(-5deg);
+                            }
+                            75% {
+                                transform: translate(-50px, 50px) rotate(3deg);
+                            }
+                            100% {
+                                transform: translate(0, 0) rotate(0deg);
+                            }
+                        }
+                    `;
+                    document.head.appendChild(styleSheet);
+                }
+                
+                // Add click event to close overlay
+                overlay.addEventListener('click', () => {
+                    hideOverlay();
+                });
+            }
+        });
+        
+        // Function to share product
+        function shareProduct() {
+            // Get current URL
+            const url = window.location.href;
+            
+            // Check if Web Share API is available
+            if (navigator.share) {
+                navigator.share({
+                    title: document.getElementById('product-name').textContent,
+                    text: document.getElementById('product-description').textContent,
+                    url: url
+                })
+                .then(() => console.log('Product shared successfully'))
+                .catch((error) => console.log('Error sharing product:', error));
+            } else {
+                // Fallback for browsers that don't support Web Share API
+                // Copy URL to clipboard
+                const tempInput = document.createElement('input');
+                document.body.appendChild(tempInput);
+                tempInput.value = url;
+                tempInput.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempInput);
+                
+                // Show notification
+                alert('Product URL copied to clipboard!');
+            }
+        }
+        
+        // Function to redirect to product visualization page
+        function redirectToProductViz() {
+            // Get current product ID from URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const productId = urlParams.get('id');
+            
+            if (productId) {
+                // Redirect to product visualization page with product ID
+                window.location.href = `product_viz.html?id=${productId}`;
+            } else {
+                // If no product ID found, show error
+                alert('Product ID not found. Cannot open visualization.');
+            }
+        }
+        
+        // Functions for image modal
+        function openImageModal() {
+            const modal = document.getElementById('image-modal');
+            const modalImage = document.getElementById('modal-image');
+            const productImage = document.getElementById('product-image');
+            
+            if (modal && modalImage && productImage) {
+                modalImage.src = productImage.src;
+                modal.style.display = 'flex';
+            }
+        }
+        
+        function closeImageModal() {
+            const modal = document.getElementById('image-modal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Product Detail</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: auto;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        input[type="text"],
+        input[type="number"],
+        select,
+        textarea {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        input[type="file"] {
+            margin-bottom: 15px;
+        }
+        button {
+            background-color: #5cb85c;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #4cae4c;
+        }
+        .message {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .message.success {
+            background-color: #dff0d8;
+            color: #3c763d;
+            border: 1px solid #d6e9c6;
+        }
+        .message.error {
+            background-color: #f2dede;
+            color: #a94442;
+            border: 1px solid #ebccd1;
+        }
+        
+        /* Autocomplete styles */
+        .autocomplete-container {
+            position: relative;
+            margin-bottom: 15px;
+        }
+        
+        .autocomplete-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+        
+        .autocomplete-suggestion {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .autocomplete-suggestion:hover,
+        .autocomplete-suggestion.highlighted {
+            background-color: #f5f5f5;
+        }
+        
+        .autocomplete-suggestion:last-child {
+            border-bottom: none;
+        }
+        
+        .suggestion-id {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .suggestion-name {
+            color: #666;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Add Product Detail</h1>
+        <form id="productDetailForm">
+            <label for="product_id">Product ID:</label>
+            <div class="autocomplete-container">
+                <input type="text" id="product_id" name="product_id" required placeholder="Type to search products...">
+                <div id="product_suggestions" class="autocomplete-suggestions"></div>
+            </div>
+
+            <label for="detail_type">Detail Type:</label>
+            <select id="detail_type" name="detail_type" required>
+                <option value="feature">SIZE</option>
+                <option value="dimension">BUILD TECHNOLOGY</option>
+                <option value="material">MATERIALS</option>
+                <option value="warranty">WARRANTY & SUPPORT</option>
+                <option value="specification">BRAND</option>
+            </select>
+
+            <label for="detail_label">Heading</label>
+            <input type="text" id="detail_label" name="detail_label" required>
+
+            <label for="detail_value">Detail Value:</label>
+            <textarea id="detail_value" name="detail_value" rows="4" required></textarea>
+
+            <!-- <label for="display_order">Display Order:</label>
+            <input type="number" id="display_order" name="display_order" value="0"> -->
+
+            <label for="sticker_image_filename">Sticker Image:</label>
+            <input type="file" id="sticker_image_filename" name="sticker_image_filename" accept="image/*">
+
+            <label for="sticker_position">Sticker Position:</label>
+            <select id="sticker_position" name="sticker_position">
+                <option value="top-right">Top-Right</option>
+                <option value="top-left">Top-Left</option>
+                <option value="bottom-right">Bottom-Right</option>
+                <option value="bottom-left">Bottom-Left</option>
+                <option value="center">Center</option>
+            </select>
+
+            <button type="submit">Add Detail</button>
+        </form>
+        <div id="message" class="message" style="display:none;"></div>
+    </div>
+    <script src="js/add_product_details.js"></script>
+</body>
+</html>
+

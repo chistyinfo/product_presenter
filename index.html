@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Placement Visualizer</title>
+    <!-- Link to the NEW stylesheet -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <!-- The main application container that controls the overall layout -->
+    <div class="app-container">
+
+        <!-- ============================================= -->
+        <!-- 1. App Header (Top Bar)                       -->
+        <!-- ============================================= -->
+        <header class="app-header">
+            <div class="logo">
+                <i class="fas fa-ruler-combined"></i>
+                <h1>Product Placement Visualizer</h1>
+            </div>
+            <div class="header-actions">
+                 <a id="single-product-btn" 
+                    title="Single Product View" 
+                    href="http://localhost/product_presenter/individual-product.html" 
+                    class="button-link">
+                    <i class="fas fa-square"></i> Single Product
+                </a>
+                <button id="fullscreen-toggle" title="Enter Fullscreen Presentation (F)">
+                    <i class="fas fa-expand"></i>
+                    <span>Fullscreen</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- ============================================= -->
+        <!-- 2. App Content (The three columns)            -->
+        <!-- ============================================= -->
+        <main class="app-content">
+
+            <!-- ============================================= -->
+            <!--   COLUMN 1: ASSETS PANEL (LEFT)             -->
+            <!-- ============================================= -->
+            <aside class="panel left-panel">
+                <!-- Backgrounds Section -->
+                <div class="panel-section">
+                    <div class="panel-header">
+                        <h2>Backgrounds</h2>
+                        <button id="add-background-btn" title="Add New Background" class="action-button-sm">
+                            <i class="fas fa-plus"></i> Add
+                        </button>
+                    </div>
+                    <div class="thumbnails-container" id="background-thumbnails">
+                        <!-- Background thumbnails will be added here -->
+                    </div>
+                </div>
+
+                <!-- Products Section -->
+                <div class="panel-section">
+                    <div class="panel-header">
+                        <h2>Products</h2>
+                        <button id="upload-product-btn" title="Upload Product for Selected Background" class="action-button-sm">
+                            <i class="fas fa-upload"></i> Upload
+                        </button>
+                    </div>
+                    <div class="thumbnails-container product-gallery-wrapper" id="product-gallery-wrapper">
+                         <div class="product-gallery" id="product-gallery">
+                            <!-- Product thumbnails will be added here -->
+                         </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- ============================================= -->
+            <!--   COLUMN 2: VISUALIZER (CENTER)             -->
+            <!-- ============================================= -->
+            <div class="panel center-panel">
+                <div id="presentation-wrapper">
+                    <div class="scene-container">
+                        <div class="ruler ruler-h"></div>
+                        <div class="ruler ruler-v"></div>
+                        <div class="scene-content-wrapper" id="scene-content">
+                            <img src="" alt="Select a background to begin" id="scene-background">
+                            <div id="marking-area" class="marking-area">
+                                <!-- JS adds resize handles here -->
+                            </div>
+                            <img src="" alt="Selected Product" id="inserted-product" style="display: none;">
+                            
+                            <!-- Fullscreen Navigation (remains hidden until fullscreen) -->
+                            <div class="fullscreen-controls">
+                                <button id="prev-product-btn" class="nav-button left" title="Previous Product (Left Arrow)"><i class="fas fa-chevron-left"></i></button>
+                                <button id="next-product-btn" class="nav-button right" title="Next Product (Right Arrow)"><i class="fas fa-chevron-right"></i></button>
+                                <div id="fullscreen-toolbar">
+                                    <button id="fullscreen-help-btn" class="toolbar-button" title="Keyboard Shortcuts (H)"><i class="fas fa-keyboard"></i></button>
+                                    <button id="product-info-btn" class="toolbar-button" title="Toggle Product Info (I)"><i class="fas fa-info-circle"></i></button>
+                                </div>
+                            </div>
+                            
+                            <div id="product-info-overlay" class="product-info-overlay">
+                                <h3 id="product-info-title">Product Name</h3>
+                                <p id="product-info-desc">Product description will appear here.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================= -->
+            <!--   COLUMN 3: INSPECTOR PANEL (RIGHT)         -->
+            <!-- ============================================= -->
+            <aside class="panel right-panel">
+                <div class="marking-controls" id="marking-controls">
+                    <h3><i class="fas fa-drafting-compass"></i> Marking Area</h3>
+                    <div class="control-grid">
+                        <div class="control-group">
+                            <label for="marking-left">X (%)</label>
+                            <input type="number" id="marking-left" step="0.1" value="25">
+                        </div>
+                        <div class="control-group">
+                            <label for="marking-top">Y (%)</label>
+                            <input type="number" id="marking-top" step="0.1" value="32">
+                        </div>
+                        <div class="control-group">
+                            <label for="marking-width">W (%)</label>
+                            <input type="number" id="marking-width" min="1" step="0.1" value="15">
+                        </div>
+                        <div class="control-group">
+                            <label for="marking-height">H (%)</label>
+                            <input type="number" id="marking-height" min="1" step="0.1" value="60">
+                        </div>
+                         <div class="control-group full-width">
+                            <label for="marking-padding">Padding (%)</label>
+                            <input type="number" id="marking-padding" min="0" step="0.1" value="0">
+                        </div>
+                    </div>
+                    <div class="measurement-display">
+                        <i class="fas fa-ruler"></i>
+                        <span>Dimensions: <strong id="marking-dimensions">0 x 0 px</strong></span>
+                    </div>
+                    <button id="save-marking-btn" class="action-button">
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                    <button id="add-product-detail-btn" class="action-button secondary">
+                        <i class="fas fa-plus"></i> Add Product Detail
+                    </button>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- ============================================= -->
+    <!-- Modals & Hidden Inputs (Unchanged)            -->
+    <!-- ============================================= -->
+    <input type="file" id="background-upload" accept="image/jpeg, image/png" style="display: none;">
+    <input type="file" id="product-upload" accept="image/jpeg, image/png" style="display: none;">
+
+    <div id="warning-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">×</span>
+            <h3><i class="fas fa-exclamation-triangle"></i> Image Warning</h3>
+            <p id="warning-message"></p>
+            <div class="modal-buttons">
+                <button id="resize-image-btn" class="action-button">Resize Image</button>
+                <button id="cancel-upload-btn" class="action-button secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="background-setup-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">×</span>
+            <h3><i class="fas fa-image"></i> New Background Setup</h3>
+            <label for="background-name">Background Name:</label>
+            <input type="text" id="background-name" placeholder="e.g., Bedroom, Office, etc.">
+            <p class="modal-instruction">Adjust the red marking area on the main screen, then save.</p>
+            <div class="modal-buttons">
+                <button id="confirm-background-btn" class="action-button"><i class="fas fa-check"></i> Confirm & Save</button>
+                <button id="cancel-background-btn" class="action-button secondary"><i class="fas fa-times"></i> Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="keyboard-shortcuts-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">×</span>
+            <h3><i class="fas fa-keyboard"></i> Keyboard Shortcuts (Fullscreen Mode)</h3>
+            <div class="shortcuts-list">
+                <div class="shortcut-item"><span class="key">↑</span><span class="description">Previous Background (with same product)</span></div>
+                <div class="shortcut-item"><span class="key">↓</span><span class="description">Next Background (with same product)</span></div>
+                <div class="shortcut-item"><span class="key">←</span><span class="description">Previous Product</span></div>
+                <div class="shortcut-item"><span class="key">→</span><span class="description">Next Product</span></div>
+                <div class="shortcut-item"><span class="key">I</span><span class="description">Toggle Product Info</span></div>
+                <div class="shortcut-item"><span class="key">H</span><span class="description">Show/Hide This Help</span></div>
+                <div class="shortcut-item"><span class="key">Esc</span><span class="description">Close Overlay / Exit Fullscreen</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Product Detail Modal -->
+    <div id="product-detail-modal" class="modal">
+        <div class="modal-content product-detail-modal-content">
+            <span class="close-modal">×</span>
+            <h3><i class="fas fa-plus-circle"></i> Add Product Detail</h3>
+            
+            <form id="productDetailForm">
+                <div class="form-group">
+                    <label for="product_id">Product ID:</label>
+                    <div class="autocomplete-container">
+                        <input type="text" id="product_id" name="product_id" required placeholder="Type to search products...">
+                        <div id="product_suggestions" class="autocomplete-suggestions"></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="detail_type">Detail Type:</label>
+                    <select id="detail_type" name="detail_type" required>
+                        <option value="feature">SIZE</option>
+                        <option value="dimension">BUILD TECHNOLOGY</option>
+                        <option value="material">MATERIALS</option>
+                        <option value="warranty">WARRANTY & SUPPORT</option>
+                        <option value="specification">BRAND</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="detail_label">Heading:</label>
+                    <input type="text" id="detail_label" name="detail_label" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="detail_value">Detail Value:</label>
+                    <textarea id="detail_value" name="detail_value" rows="4" required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="sticker_image_filename">Sticker Image:</label>
+                    <input type="file" id="sticker_image_filename" name="sticker_image_filename" accept="image/*">
+                </div>
+
+                <div class="form-group">
+                    <label for="sticker_position">Sticker Position:</label>
+                    <select id="sticker_position" name="sticker_position">
+                        <option value="top-right">Top-Right</option>
+                        <option value="top-left">Top-Left</option>
+                        <option value="bottom-right">Bottom-Right</option>
+                        <option value="bottom-left">Bottom-Left</option>
+                        <option value="center">Center</option>
+                    </select>
+                </div>
+
+                <div class="modal-buttons">
+                    <button type="submit" class="action-button">
+                        <i class="fas fa-plus"></i> Add Detail
+                    </button>
+                    <!-- <button type="button" class="action-button secondary" id="cancel-product-detail-btn">
+                        <i class="fas fa-times"></i> Cancel
+                    </button> -->
+                </div>
+            </form>
+            
+            <div id="product-detail-message" class="message" style="display:none;"></div>
+        </div>
+    </div>
+
+    <script src="js/script.js"></script>
+    <script src="js/ruler.js"></script>
+    <script src="js/product_detail_modal.js"></script>
+</body>
+</html>
