@@ -62,6 +62,23 @@ class ProductVizViewer {
     }
 
     /**
+     * Whether an id is usable for the product API.
+     *
+     * The API keys products by a positive integer. This mirrors the server-side check so a
+     * bad id fails here with a friendly message instead of hitting the network.
+     *
+     * @param {*} id
+     * @returns {boolean}
+     */
+    isValidProductId(id) {
+        if (id === null || id === undefined) return false;
+        const str = String(id).trim();
+        if (str === "") return false;
+        const num = parseInt(str, 10);
+        return !isNaN(num) && num > 0 && String(num) === str;
+    }
+
+    /**
      * Set up event listeners for UI controls
      */
     setupEventListeners() {
@@ -184,7 +201,16 @@ class ProductVizViewer {
      */
     loadFromUrlFallback() {
         if (!this.productId) {
-            this.showError("No product selected. Open the Remote screen in the app to pick one.");
+            this.showError(
+                "No product selected. Open this page with ?id=<product id>, " +
+                "or pick a product from the Remote screen in the app."
+            );
+            return;
+        }
+        if (!this.isValidProductId(this.productId)) {
+            this.showError(
+                `"${this.productId}" is not a valid product id. Expected a whole number greater than 0.`
+            );
             return;
         }
         if (this.currentProductId === this.productId) return;
@@ -363,30 +389,68 @@ class ProductVizViewer {
             // overlay is only shown for the very first paint.
             if (!this.productData) this.showLoading();
 
-            if (!id || isNaN(parseInt(id)) || parseInt(id) <= 0) {
+            if (!this.isValidProductId(id)) {
                 throw new Error("Invalid Product ID");
             }
 
             this.loadingFor = id;
-            const apiUrl = `get_product_fullscreen.php?id=${id}`;
-            
+            const apiUrl = `get_product_fullscreen.php?id=${encodeURIComponent(id)}`;
+
             const response = await fetch(apiUrl, {
                 method: "GET",
                 headers: {
-                    "Content-Type": "application/json",
                     "Accept": "application/json"
                 }
             });
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`HTTP error! status: ${response.status}. Server response: ${errorText.substring(0, 200)}`);
+
+            // Read the body as text FIRST. response.json() throws an opaque
+            // "unexpected end of data" error on an empty body (which is exactly what a
+            // server-side json_encode() failure used to produce), so we need the raw
+            // text to detect and diagnose that case ourselves.
+            let rawText = "";
+            try {
+                rawText = await response.text();
+            } catch (readError) {
+                throw new Error(`Could not read response body: ${readError.message}`);
             }
-            
-            const data = await response.json();
-            
+
+            console.debug(
+                `[product_viz] GET ${apiUrl} -> ${response.status} ` +
+                `(${rawText.length} bytes)`
+            );
+
+            const snippet = rawText.length > 200 ? rawText.substring(0, 200) + "…" : rawText;
+
+            // A non-2xx status is an error even if the body happens to be JSON.
+            if (!response.ok) {
+                // The server may still send a {"success":false,"error":"..."} document.
+                let serverError = null;
+                try { serverError = JSON.parse(rawText); } catch (_) { /* not JSON */ }
+                const detail = (serverError && serverError.error)
+                    ? serverError.error
+                    : (snippet || "empty response");
+                throw new Error(`HTTP ${response.status} ${response.statusText || ""}`.trim() + ` – ${detail}`);
+            }
+
+            // An empty 200 body is never valid: fail with a clear, actionable message
+            // instead of letting response.json() throw a cryptic parse error.
+            if (!rawText || rawText.trim() === "") {
+                throw new Error(`Empty response from server (HTTP ${response.status}). Expected JSON.`);
+            }
+
+            let data;
+            try {
+                data = JSON.parse(rawText);
+            } catch (parseError) {
+                console.error("[product_viz] Invalid JSON from server:", rawText);
+                throw new Error(
+                    `Server returned invalid JSON (HTTP ${response.status}): ` +
+                    `${parseError.message}. Raw response: ${snippet}`
+                );
+            }
+
             if (!data || !data.success || !data.product) {
-                throw new Error(data.error || "Failed to load product data");
+                throw new Error((data && data.error) || "Failed to load product data");
             }
             
             this.productData = data;
