@@ -12,7 +12,21 @@ class ProductVizViewer {
         this.isFullscreen = false;
         this.showInfo = true;
         // Background selector UI is not re-enabled by default, only arrow key switching
-        
+
+        // --- Shared-state sync -------------------------------------------------
+        // When this page is driven by the Android remote (api/state.php), it follows
+        // that document instead of the ?id= URL parameter. See startStateSync().
+        this.syncEnabled = false;      // true once a state document has been read
+        this.lastRev = -1;             // newest rev applied; -1 = nothing yet
+        this.currentProductId = null;  // product actually on screen
+        this.syncProductId = null;     // last product id pulled from the server
+        this.currentRoomName = null;   // background name actually on screen
+        this.loadingFor = null;        // id currently being fetched, to avoid duplicate loads
+        this.syncTimer = null;         // setInterval handle
+        this.syncInFlight = false;     // guard so slow polls cannot stack up
+        this.lastState = null;         // newest state document applied
+        this.desiredRoomName = null;    // room requested by the remote, applied per product
+
         this.init();
     }
 
@@ -20,13 +34,12 @@ class ProductVizViewer {
      * Initialize the viewer
      */
     init() {
-        if (!this.productId) {
-            this.showError("No product ID provided in URL");
-            return;
-        }
-        
         this.setupEventListeners();
-        this.loadProduct();
+
+        // Always start in remote-driven mode. The API is on the same origin, so no CORS
+        // concerns and no configuration needed. If the state document cannot be read the
+        // page falls back to the ?id= URL parameter behaviour it always had.
+        this.startStateSync();
     }
 
     /**
@@ -108,18 +121,254 @@ class ProductVizViewer {
         });
     }
 
+    // =========================================================================
+    // Shared-state sync (Android remote -> this page)
+    // =========================================================================
+
+    /**
+     * Start polling api/state.php and following whatever it says.
+     *
+     * Polling (rather than a push channel) is deliberate: it needs no extra server code, it
+     * survives the Apache worker being recycled, and on a LAN one request per second is
+     * negligible. The loop stops itself while the tab is hidden.
+     */
+    startStateSync() {
+        this.syncOnce();
+        this.syncTimer = setInterval(() => {
+            if (!document.hidden) this.syncOnce();
+        }, 1000);
+
+        // Catch up immediately when the tab becomes visible again.
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) this.syncOnce();
+        });
+    }
+
+    /**
+     * Read the shared state once and apply it.
+     */
+    async syncOnce() {
+        // The poll fires every second; a slow request must not stack up a queue of them.
+        if (this.syncInFlight) return;
+        this.syncInFlight = true;
+
+        try {
+            let state;
+            try {
+                const response = await fetch("api/state.php", {
+                    method: "GET",
+                    headers: { "Accept": "application/json" },
+                    cache: "no-store",
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                state = await response.json();
+            } catch (error) {
+                // The API being unreachable must not break the page. Fall back to ?id= once.
+                if (!this.syncEnabled) {
+                    console.warn("state.php unavailable, falling back to URL product:", error.message);
+                    this.loadFromUrlFallback();
+                }
+                return;
+            }
+
+            this.syncEnabled = true;
+            this.applyState(state);
+        } finally {
+            this.syncInFlight = false;
+        }
+    }
+
+    /**
+     * Load the product named in the URL, used only when the shared state is unavailable or
+     * empty. Preserves the page's original standalone behaviour.
+     */
+    loadFromUrlFallback() {
+        if (!this.productId) {
+            this.showError("No product selected. Open the Remote screen in the app to pick one.");
+            return;
+        }
+        if (this.currentProductId === this.productId) return;
+        this.loadProductById(this.productId);
+    }
+
+    /**
+     * Apply a state document to the page.
+     *
+     * Product changes require a fetch (the state only carries an id); scale/position/flip are
+     * pure CSS and are applied on every revision, which is what makes the sliders feel live.
+     */
+    applyState(state) {
+        if (!state || typeof state.rev !== "number") return;
+
+        // Older revision than what we already applied: ignore (a late response overtook).
+        if (state.rev < this.lastRev) return;
+
+        // Same revision: nothing changed, but a product load kicked off by the *previous*
+        // poll may have just finished and needs the transform re-applied. Cheap and idempotent.
+        if (state.rev === this.lastRev) {
+            this.lastState = state;
+            this.applyTransform(state);
+            return;
+        }
+
+        const productId = state.product_id != null ? String(state.product_id) : null;
+        this.desiredRoomName = state.room != null ? String(state.room) : null;
+
+        // Stored before any async work so a product load completing later can re-apply it.
+        this.lastState = state;
+        this.lastRev = state.rev;
+
+        // A product in the shared state always wins over the URL parameter.
+        const productChanging = productId && this.currentProductId !== productId;
+        if (productId) {
+            this.syncProductId = productId;
+            if (productChanging && this.loadingFor !== productId) {
+                // The room is reconciled by loadProduct() once the new product's backgrounds
+                // arrive, because a room only makes sense against a specific product.
+                this.loadProductById(productId);
+            }
+        } else if (!this.currentProductId) {
+            // State exists but names no product yet: keep the URL one so the screen isn't blank.
+            this.loadFromUrlFallback();
+        }
+
+        // Apply the room against whatever product is currently on screen. If it is not among
+        // that product's backgrounds, keep the product's own primary rather than a stale value.
+        this.selectRoom(this.desiredRoomName);
+
+        this.applyTransform(state);
+        this.hideLoading();
+    }
+
+    /**
+     * Switch to the background matching [roomName] for the product currently loaded.
+     *
+     * Returns true when the room was found. When it is not found (a room that belongs to a
+     * different product, or none named at all) the current background is left untouched and
+     * [currentRoomName] is kept in sync with what is actually displayed.
+     */
+    selectRoom(roomName) {
+        if (this.backgrounds.length === 0) return false;
+
+        if (!roomName) {
+            const current = this.backgrounds[this.currentBackgroundIndex];
+            this.currentRoomName = current ? current.name : null;
+            return false;
+        }
+
+        const index = this.backgrounds.findIndex((bg) => bg.name === roomName);
+        if (index === -1) {
+            // This product does not exist in the requested room (products are per-room rows).
+            // Show the product's own room rather than a blank screen, but say so in the
+            // console: otherwise the phone claims one room while the display shows another.
+            const current = this.backgrounds[this.currentBackgroundIndex];
+            this.currentRoomName = current ? current.name : null;
+            console.info(
+                `Room "${roomName}" has no product ${this.currentProductId}; ` +
+                `showing "${this.currentRoomName}" instead.`
+            );
+            return false;
+        }
+
+        this.currentRoomName = roomName;
+        if (index !== this.currentBackgroundIndex) {
+            this.currentBackgroundIndex = index;
+            this.renderBackground();
+            this.renderProduct();
+        }
+        return true;
+    }
+
+    /**
+     * Map the remote's normalized x/y/scale/flip onto the product.
+     *
+     * The marking rectangle from the room is the *apperture*: it stays where the room says the
+     * door belongs, at the size the room says. The remote's `scale` changes how large the
+     * product is drawn **within** that aperture, and `x`/`y` slide it around inside it. That
+     * keeps the product on the wall rather than letting a large scale push the door out of the
+     * room, and it means the same state looks correct in every differently-shaped room.
+     *
+     * `x`/`y` are 0..1 with 0.5 as the centre (state.php's defaults), left-to-right and
+     * top-to-bottom. They translate the product by up to half the aperture in either
+     * direction, so the product can never travel completely out of view.
+     */
+    applyTransform(state) {
+        const vizMarkingArea = document.getElementById("viz-marking-area");
+        const productContainer = document.getElementById("product-container");
+        if (!vizMarkingArea || !productContainer) return;
+        if (!this.productData || !this.productData.product) return;
+
+        // No state yet (first paint before the first poll landed): renderProduct() will already
+        // have applied the room's own marking rectangle, so leave it alone.
+        if (!state) return;
+
+        const background = this.backgrounds.length > 0
+            ? this.backgrounds[this.currentBackgroundIndex]
+            : null;
+
+        // Without a background there is no marking rectangle: keep the original full-bleed layout.
+        if (!background) return;
+
+        const baseTop = Number(background.marking_top_percent) || 0;
+        const baseLeft = Number(background.marking_left_percent) || 0;
+        const baseWidth = Number(background.marking_width_percent) || 100;
+        const baseHeight = Number(background.marking_height_percent) || 100;
+        const padding = Number(background.marking_padding_percent) || 0;
+
+        // Pin the aperture to the room's rectangle; the product moves inside it.
+        vizMarkingArea.style.position = "absolute";
+        vizMarkingArea.style.top = `${baseTop}%`;
+        vizMarkingArea.style.left = `${baseLeft}%`;
+        vizMarkingArea.style.width = `${baseWidth}%`;
+        vizMarkingArea.style.height = `${baseHeight}%`;
+        vizMarkingArea.style.padding = `${padding}%`;
+        vizMarkingArea.style.overflow = "visible";
+
+        // A non-positive or non-finite scale would make the product vanish; fall back to 1.
+        const scale = (typeof state.scale === "number" && isFinite(state.scale) && state.scale > 0)
+            ? state.scale
+            : 1;
+        const x = (typeof state.x === "number" && isFinite(state.x)) ? state.x : 0.5;
+        const y = (typeof state.y === "number" && isFinite(state.y)) ? state.y : 0.5;
+        const flip = state.flip === true;
+
+        // translate() runs first in the list, so shift then scale: the offset stays in aperture
+        // units and does not get magnified along with the product. Rounded because raw float
+        // arithmetic produces values like -4.000000000000001%, which is noise in a CSS string.
+        const offsetX = round2((x - 0.5) * 50);   // -25% .. +25% of the aperture
+        const offsetY = round2((y - 0.5) * 50);
+        const flipPart = flip ? " scaleX(-1)" : "";
+
+        productContainer.style.position = "relative";
+        productContainer.style.width = "100%";
+        productContainer.style.height = "100%";
+        productContainer.style.display = "flex";
+        productContainer.style.alignItems = "center";
+        productContainer.style.justifyContent = "center";
+        productContainer.style.transformOrigin = "center center";
+        productContainer.style.transform =
+            `translate(${offsetX}%, ${offsetY}%) scale(${scale})${flipPart}`;
+        productContainer.style.transition = "transform 120ms linear";
+    }
+
     /**
      * Load product data (including all linked backgrounds) from API
+     *
+     * @param {string|number} [productId] id to load; defaults to the one in the URL.
      */
-    async loadProduct() {
+    async loadProduct(productId) {
+        const id = productId != null ? String(productId) : this.productId;
         try {
-            this.showLoading();
-            
-            if (!this.productId || isNaN(parseInt(this.productId)) || parseInt(this.productId) <= 0) {
+            // Never blank the screen when swapping products on a live display: the loading
+            // overlay is only shown for the very first paint.
+            if (!this.productData) this.showLoading();
+
+            if (!id || isNaN(parseInt(id)) || parseInt(id) <= 0) {
                 throw new Error("Invalid Product ID");
             }
 
-            const apiUrl = `get_product_fullscreen.php?id=${this.productId}`;
+            this.loadingFor = id;
+            const apiUrl = `get_product_fullscreen.php?id=${id}`;
             
             const response = await fetch(apiUrl, {
                 method: "GET",
@@ -157,14 +406,36 @@ class ProductVizViewer {
                  console.warn("Product loaded but no backgrounds are associated with it.");
                  // Handle case with no backgrounds if necessary
             }
-            
+
+            this.currentProductId = id;
+            this.currentRoomName = this.backgrounds.length > 0
+                ? this.backgrounds[this.currentBackgroundIndex].name
+                : null;
+
             // Render the product and the initial background
             this.renderVisualization();
-            
+
+            // Now that this product's backgrounds are known, honour the room the remote asked
+            // for. Doing it here (rather than before the fetch) is what makes "switch product
+            // and room together" land in one step instead of two.
+            if (this.desiredRoomName && this.desiredRoomName !== this.currentRoomName) {
+                this.selectRoom(this.desiredRoomName);
+            }
+            this.applyTransform(this.lastState);
+
         } catch (error) {
             console.error("Error loading product:", error);
             this.showError(`Failed to load product details. ${error.message}`);
+        } finally {
+            this.loadingFor = null;
         }
+    }
+
+    /**
+     * Shorthand used by the state sync: load a product named by the shared state.
+     */
+    loadProductById(id) {
+        return this.loadProduct(id);
     }
 
     /**
@@ -284,6 +555,11 @@ class ProductVizViewer {
             productContainer.style.alignItems = "center";
             productContainer.style.justifyContent = "center";
         }
+
+        // Re-apply the remote's scale/position/flip. Without this, replacing the <img> (or
+        // switching room) would reset the transform to the background's default marking area
+        // and the display would jump until the next poll.
+        this.applyTransform(this.lastState);
     }
 
     /**
@@ -298,12 +574,15 @@ class ProductVizViewer {
         this.currentBackgroundIndex = index;
         this.renderBackground();
         this.renderProduct(); // Re-render product for potentially different marking area
-        
-        // Update active state in selector (if UI were visible)
-        // const options = document.querySelectorAll(".background-option");
-        // options.forEach((option, i) => {
-        //     option.classList.toggle("active", i === index);
-        // });
+
+        // Keep the sync bookkeeping in step with manual arrow-key navigation. Without this the
+        // next poll would see a room mismatch and snap the display back to the remote's room,
+        // making the keyboard unusable while the app is connected.
+        const bg = this.backgrounds[index];
+        if (bg) {
+            this.currentRoomName = bg.name;
+            this.desiredRoomName = bg.name;
+        }
     }
 
     /**
@@ -443,10 +722,31 @@ class ProductVizViewer {
     }
 }
 
+/**
+ * Constrain a number to a range.
+ * @param {number} value
+ * @param {number} min
+ * @param {number} max
+ * @returns {number}
+ */
+function clamp(value, min, max) {
+    if (!isFinite(value)) return min;
+    return Math.min(Math.max(value, min), max);
+}
+
+/**
+ * Round to two decimals, for tidy CSS values.
+ * @param {number} value
+ * @returns {number}
+ */
+function round2(value) {
+    return Math.round(value * 100) / 100;
+}
+
 // Initialize the viewer when the DOM is ready
 document.addEventListener(
     "DOMContentLoaded",
     () => {
-        new ProductVizViewer();
+        window.pvViewer = new ProductVizViewer();
     }
 );
