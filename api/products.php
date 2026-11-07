@@ -1,6 +1,10 @@
 <?php
 require_once 'config.php'; // Includes PDO connection and helpers
 
+// Keep PHP notices/warnings out of the JSON body.
+ini_set('display_errors', '0');
+error_reporting(E_ALL);
+
 // --- CORS Headers ---
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
@@ -64,10 +68,41 @@ if ($action === 'background_products') {
         send_json_response(array('error' => 'Invalid request or method not allowed for direct product access.'), 405);
     }
 } else {
-    send_json_response(array('error' => 'Invalid product API endpoint. Use ?background_id={id} for background-specific operations or /api/products/{id} for direct product access.'), 400);
+    // No ?background_id and no numeric path segment => full catalog.
+    // Additive: legacy callers always pass one of the above, so they are unaffected.
+    if ($method === 'GET') {
+        getAllProducts($pdo);
+    } else {
+        send_json_response(array('error' => 'Invalid product API endpoint. Use ?background_id={id} for background-specific operations or /api/products/{id} for direct product access.'), 400);
+    }
 }
 
 // --- CONTROLLER FUNCTIONS ---
+
+function getAllProducts($pdo) {
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM Products ORDER BY created_at DESC");
+        $stmt->execute();
+        $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($products as &$prod) { // Pass by reference
+            if (isset($prod['image_filename'])) {
+                $prod['imageUrl'] = UPLOADS_BASE_URL . '/products/' . $prod['image_filename'];
+            }
+        }
+        unset($prod); // Unset reference
+
+        http_response_code(200);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array(
+            'products' => $products,
+            'count' => count($products)
+        ));
+        exit;
+    } catch (PDOException $e) {
+        error_log('products.php full catalog failed: ' . $e->getMessage());
+        send_json_response(array('error' => 'Failed to fetch products'), 500);
+    }
+}
 
 function getProductsByBackground($pdo, $background_id) {
     $stmt = $pdo->prepare("SELECT id FROM Backgrounds WHERE id = ?");

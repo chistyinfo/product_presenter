@@ -59,6 +59,14 @@ define('DB_USER', 'root');    // Your database username
 define('DB_PASS', ''); // Your database password
 define('DB_CHARSET', 'utf8mb4');
 
+// --- Optional API Token ---
+// When set to a non-empty string, write (POST) requests to the newer JSON
+// endpoints must send a matching `X-PV-Token` header. GET requests are never
+// gated. Leave empty to allow all requests (current behaviour).
+if (!defined('PV_TOKEN')) {
+    define('PV_TOKEN', '');
+}
+
 // --- Uploads Configuration ---
 define('UPLOADS_DIR', __DIR__ . '/../uploads'); // Absolute path to uploads directory
 define('BACKGROUND_UPLOADS_DIR', UPLOADS_DIR . '/backgrounds');
