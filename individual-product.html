@@ -139,7 +139,9 @@
                 <span>ProductViz</span>
             </div>
             <nav class="nav-links">
-                <a href="http://localhost/product_presenter/" class="nav-link">Setting</a>
+                <!-- Relative on purpose: the viz page is served from 192.168.0.113,
+                     so a hardcoded "localhost" would point at the visitor's own PC. -->
+                <a href="index.html" class="nav-link">Setting</a>
             </nav>
         </header>
 
@@ -248,20 +250,36 @@
     </div>
     <script src="js/product_viewer.js"></script>
     <script src="js/product_search.js"></script>
+    <!-- PC-side listener for the Android remote: lets the phone send the display
+         back to product_viz.html ("Visualize") and keeps the PC-presence
+         heartbeat alive while this page is the one on screen. -->
+    <script src="js/pc_remote_nav.js"></script>
     <script>
         // Logo Animation Overlay Script
         document.addEventListener('DOMContentLoaded', function() {
             // Check if this is the first visit to the page in this session
             const isFirstVisit = !sessionStorage.getItem('hasVisitedProductPage');
             const overlay = document.getElementById('logo-animation-overlay');
-            
+
+            // The Android remote can send the display straight here. In that case
+            // the audience asked for a product, not a 3-second brand reel, so
+            // js/pc_remote_nav.js leaves a flag asking us to skip the splash.
+            let skipOverlay = false;
+            try {
+                skipOverlay = sessionStorage.getItem('pvSkipLogoOverlay') === '1';
+                if (skipOverlay) sessionStorage.removeItem('pvSkipLogoOverlay');
+            } catch (e) { /* storage unavailable: behave as before */ }
+
             // Only show overlay on first visit
-            if (isFirstVisit) {
+            if (isFirstVisit && !skipOverlay) {
                 // Mark that user has visited the page
                 sessionStorage.setItem('hasVisitedProductPage', 'true');
                 
                 // Show the overlay
                 showOverlay();
+            } else if (skipOverlay && isFirstVisit) {
+                // Still record the visit so a later manual reload is also clean.
+                sessionStorage.setItem('hasVisitedProductPage', 'true');
             }
             
             // Function to show overlay and hide scrollbar
@@ -403,18 +421,22 @@
             }
         }
         
-        // Function to redirect to product visualization page
+        // Function to redirect to product visualization page.
+        // NOTE: this inline definition overrides the one in js/product_viewer.js
+        // for this page, so it must stay in sync with js/pc_remote_nav.js.
         function redirectToProductViz() {
             // Get current product ID from URL
             const urlParams = new URLSearchParams(window.location.search);
             const productId = urlParams.get('id');
-            
-            if (productId) {
-                // Redirect to product visualization page with product ID
-                window.location.href = `product_viz.html?id=${productId}`;
+
+            if (window.pvRemoteNav) {
+                // Shared helper: replace() rather than a push so the PC does not
+                // accumulate history entries; falls back to the product on screen.
+                window.pvRemoteNav.showVisualization(productId);
+            } else if (productId) {
+                window.location.replace(`product_viz.html?id=${encodeURIComponent(productId)}`);
             } else {
-                // If no product ID found, show error
-                alert('Product ID not found. Cannot open visualization.');
+                window.location.replace('product_viz.html');
             }
         }
         

@@ -410,3 +410,222 @@ curl -X POST -H "Content-Type: application/json" \
 - [ ] Token (`X-PV-Token`) is **POST-only** and only when the server enables it; GET never needs it.
 - [ ] `state.php` POST returns the **full updated state** (use the returned `rev`).
 - [ ] Timestamps from DB are `YYYY-MM-DD HH:MM:SS` (server local); `state.updated_at` is ISO-8601 UTC — keep them separate in your models.
+
+---
+
+## 8. UPDATE 2026-11-13 22:25 (+06:00) — "Details" / "Visualize" on the PC
+
+> **For the Android Studio agent — a ready-to-paste prompt lives in
+> [`ANDROID_AGENT_PROMPT.md`](ANDROID_AGENT_PROMPT.md).** Read this whole section before
+> changing the app.
+> Goal: tapping **Details** on the phone must open the product details page on the
+> **PC browser**, not on the phone. The web/server side is **already done**; only the
+> app-side handler is missing. Nothing below requires a new server file.
+
+### 8.1 What already exists (do not rebuild it)
+
+| Piece | Status |
+|---|---|
+| Transport (`api/state.php`, 1 s poll on the PC) | already used by Prev/Next/Room/Scale/Position |
+| PC listener `js/pc_remote_nav.js` | **new**, already wired into `product_viz.html` + `individual-product.html` |
+| `nav` command + `heartbeat` + `pc_online` on `state.php` | **new**, already deployed |
+| `products.php?name=` name→id resolver | **new**, already deployed |
+
+The PC now navigates **by itself** when it sees a new `nav_seq`. The phone's only job
+is to POST that command. **The app must never call `startActivity` / open a browser
+intent for "Details".**
+
+### 8.2 New state fields (GET `state.php`)
+
+```json
+{
+  "rev": 616, "product_id": 37, "room": "living-room7",
+  "scale": 1, "x": 0.5, "y": 0.5, "flip": false,
+  "nav_seq": 2,
+  "nav_target": "viz",
+  "nav_product_id": 37,
+  "updated_at": "2026-11-13T16:24:46+00:00",
+  "pc_online": true,
+  "pc_seen_at": "2026-11-13T16:24:45+00:00"
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `nav_seq` | int | server-controlled; +1 on every nav command. Do not send it. |
+| `nav_target` | string\|null | `"details"`, `"viz"` or `null` (last command) |
+| `nav_product_id` | int\|null | product the last command referred to |
+| `pc_online` | bool | **authoritative "is the PC connected" flag** (heartbeat < 10 s) |
+| `pc_seen_at` | string\|null | ISO-8601 of the newest PC heartbeat; `null` = never seen |
+
+`rev` still means what it meant before. **Bind the "Live" indicator to `pc_online`.**
+
+### 8.3 New POST bodies
+
+```jsonc
+// 1) Open the details page on the PC
+{ "nav": { "target": "details", "product_id": 37 } }
+
+// 2) Send the PC back to the visualizer
+{ "nav": { "target": "viz", "product_id": 37 } }
+```
+
+- `product_id` is optional: omit it and the server uses the current `state.product_id`.
+- Success → **200** with the full updated state (note the bumped `nav_seq`).
+- PC not connected → **409** `{"ok":false,"error":{"code":"pc_offline","message":"..."}}`
+  and **nothing is stored** — the display will not jump when it comes back.
+- Bad target / bad id → **400** `bad_request`.
+
+Do **not** POST `heartbeat` from the app; that is the PC's job. Posting it from the
+phone would make `pc_online` lie.
+
+### 8.4 Name → id resolution (only needed if the app has no id)
+
+The app normally knows `state.product_id`. If a screen only has the display **name**
+("803"), resolve it first. **Names are NOT unique** in this database: "803" exists as
+id 37 (room `living-room01`) and id 36 (room `3`). Always narrow by room:
+
+```http
+GET api/products.php?name=803&room=living-room01     # room NAME (from state.room)
+GET api/products.php?name=803&background_id=1       # or the numeric room id
+```
+
+```json
+{ "products": [ { "id": 37, "background_id": 1, "name": "803", "...": "..." } ],
+  "count": 1, "match": "exact", "query": "803", "ambiguous": false }
+```
+
+Selection rule, in order:
+1. `ambiguous == false` and `count == 1` → use `products[0].id`.
+2. `ambiguous == true` → prefer the row whose `id` equals `state.product_id`.
+3. Otherwise → show "Product not found" and do **not** send a nav command.
+
+`match` is `"exact"` or `"contains"` (a `LIKE` fallback). A `contains` result with
+`ambiguous: true` is a loose match — treat it as unreliable.
+
+### 8.5 Kotlin implementation
+
+The existing `updateState(Map<String, Any?>)` call already supports this shape.
+
+```kotlin
+private fun sendNav(target: String, productId: Int?) {
+    lifecycleScope.launch {
+        try {
+            val body = mapOf("nav" to mapOf("target" to target, "product_id" to productId))
+            val state = api.updateState(PV_TOKEN.takeIf { it.isNotBlank() }, body)
+            // Success: the PC navigates by itself within ~1 s. Stay on the Remote screen.
+            Log.i("PV", "nav=$target id=$productId -> nav_seq=${state.nav_seq}")
+        } catch (e: HttpException) {
+            when (e.code()) {
+                409 -> toast("PC not connected")
+                400 -> toast("Invalid product for details")
+                else -> toast("Failed to reach PC")
+            }
+        } catch (e: IOException) {
+            toast("PC not connected")
+        }
+    }
+}
+
+// Details button — no Intent, no startActivity, no preview on the phone.
+fun onDetailsClicked() {
+    val id = state.productId ?: resolveIdByName(state.productName, state.room, state.productId)
+    if (id == null) { toast("Product not found"); return }
+    sendNav("details", id)
+}
+
+// Visualize button
+fun onVisualizeClicked() {
+    val id = state.productId ?: resolveIdByName(state.productName, state.room, state.productId)
+    sendNav("viz", id)   // id may be null: the server falls back to state.product_id
+}
+```
+
+Name fallback + the new response type:
+
+```kotlin
+@GET("products.php")
+suspend fun productsByName(
+    @Query("name") name: String,
+    @Query("room") room: String? = null,
+    @Query("background_id") backgroundId: Int? = null
+): ProductsByNameResponse
+
+data class ProductsByNameResponse(
+    val products: List<Product>,
+    val count: Int,
+    val match: String?,
+    val ambiguous: Boolean
+)
+
+private suspend fun resolveIdByName(name: String?, room: String?, currentId: Int?): Int? {
+    if (name.isNullOrBlank()) return null
+    return try {
+        val res = api.productsByName(name, room)
+        when {
+            !res.ambiguous && res.products.size == 1 -> res.products[0].id
+            currentId != null && res.products.any { it.id == currentId } -> currentId
+            else -> null
+        }
+    } catch (e: Exception) { null }
+}
+```
+
+Also extend the state model (all nullable so old payloads still parse):
+
+```kotlin
+data class PresentationState(
+    val rev: Int,
+    val product_id: Int?,
+    val room: String?,
+    val scale: Double,
+    val x: Double,
+    val y: Double,
+    val flip: Boolean,
+    val updated_at: String?,
+    val nav_seq: Int? = null,
+    val nav_target: String? = null,
+    val nav_product_id: Int? = null,
+    val pc_online: Boolean? = null,
+    val pc_seen_at: String? = null
+)
+```
+
+### 8.6 Optional UX (recommended)
+
+- Poll `state.php` every 2–3 s on the Remote screen; bind `pc_online` to the "Live"
+  indicator (`true` → "Live", `false` → "PC not connected").
+- Grey out **Details**/**Visualize** while `pc_online == false`. The 409 toast is the
+  safety net, not the primary signal.
+- Keep both handlers free of any `Intent` / `startActivity` call.
+
+### 8.7 Test procedure (with product 803 showing)
+
+1. On the PC, open `http://192.168.0.113/product_presenter/product_viz.html` and leave it
+   running. Confirm the phone shows **Live** (`pc_online: true`).
+2. Confirm the remote shows **803** and that
+   `curl "http://192.168.0.113/product_presenter/api/state.php"` reports `"product_id": 37`.
+3. Tap **Details**.
+   - Expected: within ~1 s the **PC browser** goes to
+     `http://192.168.0.113/product_presenter/individual-product.html?id=37`.
+   - Expected: the **phone stays on the Remote screen**; no browser/app opens on it.
+   - Expected: the PC did not gain a history entry (navigation uses `location.replace`).
+4. Check `state.nav_seq` increased by exactly 1 and `nav_target` is `"details"`.
+5. Tap **Details** again for the same product → the PC must not reload or flash.
+6. Change product with **Next** on the phone, then tap **Details** → the PC opens the
+   details page for the **new** product's id.
+7. Tap **Visualize** → the PC returns to `product_viz.html?id=<current>`.
+8. Close the PC browser, wait ~10 s (`pc_online` → `false`), tap **Details** → the phone
+   shows **"PC not connected"**, nothing navigates, and **no new `nav_seq`** is written.
+9. Re-open the PC browser → it loads cleanly and does **not** auto-jump (stale commands
+   are ignored on a fresh session).
+
+### 8.8 Failure modes to expect
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| PC never navigates | old cached `pc_remote_nav.js` | hard-refresh the PC page (Ctrl+F5) |
+| Phone always says "PC not connected" | PC page closed, or tab hidden >10 s, or `api/data/presence.json` not writable | keep the viz tab visible; check that file exists |
+| PC jumps to the **wrong** product | name-only lookup was ambiguous | pass `room`/`background_id`, or always use `state.product_id` |
+| PC navigates twice | app POSTed `nav` twice (double tap) | debounce the button ~1 s; the server dedupes by `nav_seq` anyway |
+| Details opens on the **phone** | old handler still calls an Intent | remove that branch — see 8.5 |

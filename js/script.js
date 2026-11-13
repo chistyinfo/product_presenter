@@ -54,7 +54,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // --- API Configuration ---
-    const API_BASE_URL = "http://localhost/product_presenter/api";
+    // Relative on purpose: the app is served from 192.168.0.113 on the LAN, so a
+    // hardcoded "localhost" would resolve to the viewer's own machine.
+    const API_BASE_URL = "api";
 
     // --- State Variables ---
     let currentProductServerId = null;

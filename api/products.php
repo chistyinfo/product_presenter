@@ -25,11 +25,19 @@ $request_uri_parts = array_values(array_filter($request_uri_parts));
 $background_id = null;
 $product_id = null;
 $action = '';
+$product_name = null;
 
 // Check for background_id in query parameter (easier routing)
 if (isset($_GET['background_id']) && is_numeric($_GET['background_id'])) {
     $background_id = (int)$_GET['background_id'];
     $action = 'background_products';
+}
+
+// Name lookup: lets the Android remote resolve a display name ("803") to the
+// database ids it needs for nav commands. Additive; legacy routes unaffected.
+if (isset($_GET['name']) && trim((string)$_GET['name']) !== '') {
+    $product_name = trim((string)$_GET['name']);
+    $action = 'products_by_name';
 }
 
 // Look for numeric ID in URL path for direct product access
@@ -49,7 +57,13 @@ if (!$action && $background_id) {
 }
 
 // --- ROUTING ---
-if ($action === 'background_products') {
+if ($action === 'products_by_name') {
+    if ($method === 'GET') {
+        getProductsByName($pdo, $product_name);
+    } else {
+        send_json_response(array('error' => 'Only GET is allowed for name lookups.'), 405);
+    }
+} elseif ($action === 'background_products') {
     if ($method === 'GET' && !$product_id) { // Ensure product_id is not set for this route
         getProductsByBackground($pdo, $background_id);
     } elseif ($method === 'POST' && !$product_id) { // Ensure product_id is not set for this route
@@ -101,6 +115,89 @@ function getAllProducts($pdo) {
     } catch (PDOException $e) {
         error_log('products.php full catalog failed: ' . $e->getMessage());
         send_json_response(array('error' => 'Failed to fetch products'), 500);
+    }
+}
+
+/**
+ * GET /api/products.php?name=<display name>[&background_id=<id>|&room=<name>][&limit=n]
+ *
+ * Resolve a product display name (what the remote shows, e.g. "803") to rows
+ * carrying the numeric id needed to build an individual-product.html?id= URL.
+ *
+ * Names are ONLY unique per room in this database ("803" exists twice, in two
+ * different backgrounds), so callers should narrow the search whenever they can:
+ *   - &background_id=8   the room id the display is on
+ *   - &room=living-room5 the room NAME (from state.room) when only that is known
+ * If several rows still match, `ambiguous` is true and the client must pick --
+ * normally by preferring the product_id already present in api/state.php.
+ *
+ * Exact matches are returned first; if there are none, a "contains" search runs
+ * so "80" still finds "803".
+ */
+function getProductsByName($pdo, $name) {
+    $limit = 25;
+    if (isset($_GET['limit']) && is_numeric($_GET['limit'])) {
+        $limit = max(1, min(100, (int)$_GET['limit']));
+    }
+
+    // Optional room narrowing: numeric id or room name.
+    $whereExtra = '';
+    $extraParams = array();
+    $roomFilter = isset($_GET['room']) ? trim((string)$_GET['room']) : '';
+    if (isset($_GET['background_id']) && is_numeric($_GET['background_id'])) {
+        $whereExtra = ' AND background_id = ?';
+        $extraParams[] = (int)$_GET['background_id'];
+    } elseif ($roomFilter !== '') {
+        // Resolve the room name to its id(s); Backgrounds.name is what state.room carries.
+        $bgStmt = $pdo->prepare("SELECT id FROM Backgrounds WHERE name = ?");
+        $bgStmt->execute(array($roomFilter));
+        $roomIds = array();
+        while ($bgRow = $bgStmt->fetch(PDO::FETCH_ASSOC)) {
+            $roomIds[] = (int)$bgRow['id'];
+        }
+        if (count($roomIds) === 0) {
+            $roomIds[] = -1; // unknown room -> deliberately no matches
+        }
+        $whereExtra = ' AND background_id IN (' . implode(',', array_fill(0, count($roomIds), '?')) . ')';
+        $extraParams = $roomIds;
+    }
+
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM Products WHERE name = ?" . $whereExtra . " ORDER BY created_at DESC LIMIT " . $limit);
+        $stmt->execute(array_merge(array($name), $extraParams));
+        $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $match = 'exact';
+
+        if (count($products) === 0) {
+            $match = 'contains';
+            $stmt = $pdo->prepare("SELECT * FROM Products WHERE name LIKE ?" . $whereExtra . " ORDER BY created_at DESC LIMIT " . $limit);
+            $stmt->execute(array_merge(array('%' . $name . '%'), $extraParams));
+            $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        foreach ($products as &$prod) {
+            if (isset($prod['image_filename'])) {
+                $prod['imageUrl'] = UPLOADS_BASE_URL . '/products/' . $prod['image_filename'];
+            }
+        }
+        unset($prod);
+
+        http_response_code(200);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(array(
+            'products'  => $products,
+            'count'     => count($products),
+            'match'     => $match,
+            'query'     => $name,
+            // true => the name is duplicated across rooms; the caller must
+            // choose (usually the product_id currently in state.php).
+            'ambiguous' => count($products) > 1
+        ));
+        exit;
+    } catch (PDOException $e) {
+        error_log('products.php name lookup failed: ' . $e->getMessage());
+        send_json_response(array('error' => 'Failed to look up products by name'), 500);
     }
 }
 

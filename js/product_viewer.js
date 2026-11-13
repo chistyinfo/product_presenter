@@ -502,9 +502,19 @@ function shareProduct() {
 }
 
 function redirectToProductViz() {
-    // Redirect to a general product visualization page or dashboard
-    // Update the URL as needed
-    window.location.href = 'http://localhost/product_presenter/'; // Example redirect
+    // Send the display back to the visualizer for the product being viewed.
+    // Relative on purpose: the app is served from 192.168.0.113 on the LAN, so a
+    // hardcoded "localhost" would resolve to the visitor's own machine.
+    const urlParams = new URLSearchParams(window.location.search);
+    const productId = urlParams.get('id');
+    if (productId) {
+        window.location.href = `product_viz.html?id=${encodeURIComponent(productId)}`;
+    } else if (window.pvRemoteNav) {
+        // No ?id= available: let the shared listener use the product on screen.
+        window.pvRemoteNav.showVisualization();
+    } else {
+        window.location.href = 'product_viz.html';
+    }
 }
 
 
