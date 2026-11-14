@@ -255,12 +255,19 @@ class ProductViewer {
         } catch (error) {
             // A superseded request must not paint an error over the product that replaced it.
             if (token !== this.loadToken) return;
-            console.error("Error loading product:", error);
-            this.showError(`Failed to load product details. ${error.message}`);
+            // Log the real error with its stack so the failing line is visible even
+            // though the panel below can only show one sentence.
+            console.error(`Error loading product ${requestedId || "(latest)"}:`, error,
+                error && error.stack ? "\n" + error.stack : "");
+            this.showError(`Failed to load product details. ${error && error.message ? error.message : error}`);
         } finally {
             if (token === this.loadToken) this.loadingFor = null;
             // Ensure loading is hidden unless an error is explicitly shown.
-            if (document.getElementById("error-message").style.display !== "flex") {
+            // Guarded: this used to dereference .style on a missing element, which
+            // threw inside finally() and replaced the real error with
+            // "Cannot read properties of null (reading 'style')".
+            const overlay = document.getElementById("error-message");
+            if (!overlay || overlay.style.display !== "flex") {
                 this.hideLoading();
             }
         }
@@ -269,20 +276,26 @@ class ProductViewer {
     renderProduct() {
         const { product, background, details, stickers } = this.productData;
 
-        document.getElementById("product-name").textContent =
-            product.name || "Product Name";
-        document.getElementById("product-description").textContent =
-            product.description || "Product description goes here.";
+        const nameEl = document.getElementById("product-name");
+        if (nameEl) nameEl.textContent = product.name || "Product Name";
+        const descEl = document.getElementById("product-description");
+        if (descEl) descEl.textContent = product.description || "Product description goes here.";
 
+        // A page without #product-image (or a render that races a navigation) must
+        // not take down the whole view: log it and keep the text/marking rendering.
         const productImage = document.getElementById("product-image");
-        const imagePath = `uploads/products/${product.image}`;
-        console.log("Setting product image path:", imagePath);
-        // Drop any zoom left over from the previous product so the swap starts clean.
-        this.isZoomMode = false;
-        this.currentScale = 1;
-        productImage.style.transform = "";
-        productImage.src = imagePath;
-        productImage.alt = product.name || "Product Image";
+        if (!productImage) {
+            console.error("[product_viewer] #product-image is missing; cannot show the product photo.");
+        } else {
+            const imagePath = `uploads/products/${product.image}`;
+            console.log("Setting product image path:", imagePath);
+            // Drop any zoom left over from the previous product so the swap starts clean.
+            this.isZoomMode = false;
+            this.currentScale = 1;
+            productImage.style.transform = "";
+            productImage.src = imagePath;
+            productImage.alt = product.name || "Product Image";
+        }
 
         this.renderDetails(details);
         this.renderStickers(stickers);
@@ -293,11 +306,13 @@ class ProductViewer {
 
         document.title = `${product.name || "Product"} - Product Visualizer`;
         this.hideLoading(); // Hide loading after all rendering is set up.
-        document.getElementById("main-content").style.display = "flex"; // Show main content
+        const main = document.getElementById("main-content");
+        if (main) main.style.display = "flex"; // Show main content
     }
 
     renderDetails(details) {
         const detailsGrid = document.getElementById("details-grid");
+        if (!detailsGrid) return; // page without a details grid: nothing to draw
         detailsGrid.innerHTML = ""; // Clear existing example details
 
         if (!details || details.length === 0) {
@@ -362,6 +377,7 @@ class ProductViewer {
 
     renderStickers(stickers) {
         const stickersContainer = document.getElementById("stickers-container");
+        if (!stickersContainer) return;
         stickersContainer.innerHTML = ""; // Clear existing example stickers
 
         if (!stickers || stickers.length === 0) {
@@ -433,7 +449,7 @@ class ProductViewer {
 
         document.addEventListener("keydown", (e) => {
             if (e.key === "Escape") {
-                if (modal.style.display === "flex") {
+                if (modal && modal.style.display === "flex") {
                     this.closeImageModal();
                 } else if (this.isZoomMode) {
                     this.exitZoomMode();
@@ -584,25 +600,37 @@ class ProductViewer {
     }
 
     showLoading() {
-        document.getElementById("loading-spinner").style.display = "flex";
-        document.getElementById("main-content").style.display = "none";
-        document.getElementById("error-message").style.display = "none";
+        const spinner = document.getElementById("loading-spinner");
+        if (spinner) spinner.style.display = "flex";
+        const main = document.getElementById("main-content");
+        if (main) main.style.display = "none";
+        const err = document.getElementById("error-message");
+        if (err) err.style.display = "none";
     }
 
     hideLoading() {
-        document.getElementById("loading-spinner").style.display = "none";
+        const spinner = document.getElementById("loading-spinner");
+        if (spinner) spinner.style.display = "none";
         // Main content visibility is handled in renderProduct after successful load
     }
 
+    /**
+     * Show the error panel. Every step is guarded: a missing panel must never
+     * throw from inside another error path (which is how the real message used
+     * to be replaced by "Cannot read properties of null (reading 'style')").
+     */
     showError(message) {
         this.hideLoading(); // Hide loading spinner first
         const errorContainer = document.getElementById("error-message");
-        const errorMessageElement = errorContainer.querySelector("p");
-        if (errorMessageElement) {
-            errorMessageElement.textContent = message;
+        if (errorContainer) {
+            const errorMessageElement = errorContainer.querySelector("p");
+            if (errorMessageElement) {
+                errorMessageElement.textContent = message;
+            }
+            errorContainer.style.display = "flex";
         }
-        errorContainer.style.display = "flex";
-        document.getElementById("main-content").style.display = "none"; // Hide main content on error
+        const main = document.getElementById("main-content");
+        if (main) main.style.display = "none"; // Hide main content on error
     }
 
     escapeHtml(unsafe) {

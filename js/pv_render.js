@@ -106,19 +106,35 @@
         stage.style.position = 'relative';
         stage.style.overflow = 'hidden';
 
-        // Background fills the whole stage (aspect ratio already matches).
-        const bg = document.createElement('img');
-        bg.className = 'pv-stage-bg';
-        bg.src = opts.backgroundUrl || '';
-        bg.alt = opts.backgroundName || 'Background';
-        bg.style.position = 'absolute';
-        bg.style.inset = '0';
-        bg.style.width = '100%';
-        bg.style.height = '100%';
-        bg.style.objectFit = 'fill'; // stage already has the image's ratio
-        bg.style.display = 'block';
-        bg.draggable = false;
-        stage.appendChild(bg);
+        // A product can exist with no (or a broken) background image. A neutral
+        // surface keeps the text and the product image legible instead of letting
+        // the whole scene fail; the <img> is only added when there is a URL,
+        // because `src=""` would re-request the page itself.
+        stage.style.background = '#111';
+
+        if (opts.backgroundUrl) {
+            // Background fills the whole stage (aspect ratio already matches).
+            const bg = document.createElement('img');
+            bg.className = 'pv-stage-bg';
+            bg.alt = opts.backgroundName || 'Background';
+            bg.style.position = 'absolute';
+            bg.style.inset = '0';
+            bg.style.width = '100%';
+            bg.style.height = '100%';
+            bg.style.objectFit = 'fill'; // stage already has the image's ratio
+            bg.style.display = 'block';
+            bg.draggable = false;
+            // A 404 / unreadable file must not leave a broken-image icon across
+            // the whole stage: drop the img and let the solid stage show through.
+            bg.addEventListener('error', function () {
+                console.error('[pv_render] background image failed to load:', bg.src);
+                if (bg.parentNode) bg.parentNode.removeChild(bg);
+            });
+            bg.src = opts.backgroundUrl;
+            stage.appendChild(bg);
+        } else {
+            console.warn('[pv_render] no background image URL; using a solid stage.');
+        }
 
         (opts.products || []).forEach(function (prod) {
             const box = document.createElement('div');
@@ -128,13 +144,22 @@
 
             const img = document.createElement('img');
             img.className = 'pv-product-img';
-            img.src = prod.url || '';
             img.alt = prod.name || 'Product';
             img.style.width = '100%';
             img.style.height = '100%';
             img.style.objectFit = 'contain'; // never distort the door
             img.style.display = 'block';
             img.draggable = false;
+            // A product row can legitimately have no image; skip `src=""` (it
+            // requests the current page) and keep the empty box rather than
+            // throwing away the whole scene.
+            if (prod.url) {
+                img.addEventListener('error', function () {
+                    console.error('[pv_render] product image failed to load:', img.src);
+                    img.style.visibility = 'hidden';
+                });
+                img.src = prod.url;
+            }
             box.appendChild(img);
 
             stage.appendChild(box);
@@ -177,6 +202,15 @@
      * @param {Array}  scene.products
      */
     function renderScene(host, scene) {
+        // A missing host used to surface as "Cannot read properties of null
+        // (reading 'style')" from getComputedStyle()/host.style below. Fail loudly
+        // and return an inert handle so callers (and their catch blocks) never
+        // have to dereference null.
+        if (!host) {
+            console.error('[pv_render] renderScene called without a host element.');
+            return { stage: null, refit: function () {}, detach: function () {} };
+        }
+
         host.innerHTML = '';
         // Only establish a positioning context when the host does not already
         // provide one. #pv-host (settings) is position:absolute and

@@ -210,9 +210,16 @@
         </button>
     </div>
 
-    <!-- Shared renderer first, then the viewer logic -->
-    <script src="js/pv_render.js"></script>
-    <script src="js/product_viz.js"></script>
+    <!-- Shared renderer first, then the viewer logic.
+
+         The ?v=3 tag is load-bearing: without it the browser keeps the PREVIOUS
+         product_viz.js (the pre-renderScene version, which ran
+         document.getElementById("viz-marking-area").style... on markup that no
+         longer has that id) and every product fails with
+         "Cannot read properties of null (reading 'style')".
+         Bump this number whenever either of these two files changes. -->
+    <script src="js/pv_render.js?v=3"></script>
+    <script src="js/product_viz.js?v=3"></script>
     <script src="js/pc_remote_nav.js?v=2"></script>
 </body>
 </html>
