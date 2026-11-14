@@ -265,11 +265,61 @@ function createProductForBackground($pdo, $background_id) {
 
     if (move_uploaded_file($file['tmp_name'], $uploadPath)) {
         try {
-            $sql = "INSERT INTO Products (background_id, name, description, image_filename)
-                    VALUES (?, ?, ?, ?)";
+            // Natural pixel size (needed by the editor to lock aspect ratio and
+            // by v1 to reproduce geometry). NULL is tolerated.
+            $image_width = null;
+            $image_height = null;
+            $size = @getimagesize($uploadPath);
+            if ($size !== false && !empty($size[0]) && !empty($size[1])) {
+                $image_width = (int) $size[0];
+                $image_height = (int) $size[1];
+            }
+
+            $sql = "INSERT INTO Products (background_id, name, description, image_filename, image_width, image_height)
+                    VALUES (?, ?, ?, ?, ?, ?)";
             $stmt = $pdo->prepare($sql);
-            $stmt->execute(array($background_id, $name, $description, $image_filename));
+            $stmt->execute(array($background_id, $name, $description, $image_filename, $image_width, $image_height));
             $newProductId = $pdo->lastInsertId();
+
+            // Auto-assign the new product to its background so "upload" implies
+            // "it belongs here" (the editor still lets you unassign later).
+            $bgStmt = $pdo->prepare("SELECT image_width, image_height, marking_left_percent, marking_top_percent, marking_width_percent, marking_height_percent, marking_padding_percent FROM Backgrounds WHERE id = ?");
+            $bgStmt->execute(array($background_id));
+            $bg = $bgStmt->fetch(PDO::FETCH_ASSOC);
+
+            $hPct = 70.0;
+            $wPct = 20.0;
+            $xPct = 40.0;
+            $yPct = 15.0;
+            $padPct = 0.0;
+            if ($bg && $image_width && $image_height && !empty($bg['image_width']) && !empty($bg['image_height'])) {
+                $bgAspect = $bg['image_width'] / $bg['image_height'];
+                $prodAspect = $image_width / $image_height;
+                $wPct = $hPct * $prodAspect / $bgAspect;
+                $wPct = max(1.0, min(100.0, $wPct));
+                $xPct = max(0.0, (100.0 - $wPct) / 2.0);
+                $yPct = max(0.0, (100.0 - $hPct) / 2.0);
+            } elseif ($bg) {
+                // No natural sizes: fall back to the legacy marking rectangle.
+                $wPct = max(1.0, min(100.0, floatval($bg['marking_width_percent'])));
+                $hPct = max(1.0, min(100.0, floatval($bg['marking_height_percent'])));
+                $xPct = max(0.0, min(100.0, floatval($bg['marking_left_percent'])));
+                $yPct = max(0.0, min(100.0, floatval($bg['marking_top_percent'])));
+                $padPct = max(0.0, floatval($bg['marking_padding_percent']));
+            }
+
+            $asg = $pdo->prepare("
+                INSERT INTO background_products
+                    (background_id, product_id, x_percent, y_percent, w_percent, h_percent,
+                     padding_percent, z_index, sort_order, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 1)
+                ON DUPLICATE KEY UPDATE is_active = 1
+            ");
+            $asg->execute(array(
+                $background_id, $newProductId,
+                round($xPct, 2), round($yPct, 2), round($wPct, 2), round($hPct, 2),
+                round($padPct, 2)
+            ));
 
             getProductById($pdo, $newProductId); 
         } catch (PDOException $e) {

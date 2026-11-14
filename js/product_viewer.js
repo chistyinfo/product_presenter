@@ -1,14 +1,27 @@
-
 // Product Viewer JavaScript
 class ProductViewer {
     constructor() {
         this.productId = this.getProductIdFromUrl(); // Can be null if no ID in URL
+        this.initialProductId = this.productId;      // What ?id= said when the page opened
+        this.currentProductId = null;                // Product actually on screen
         this.productData = null;
         this.isZoomMode = false; // Track if zoom mode is active
         this.currentScale = 1; // Track current zoom level
         this.minScale = 0.5; // Minimum zoom level
         this.maxScale = 3; // Maximum zoom level
         this.scaleStep = 0.1; // Zoom step per scroll
+
+        // --- Shared-state sync (Android remote -> this page) -------------------
+        // product_viz.html always followed api/state.php, but this page used to load
+        // ?id= once and then ignore every later change. That is why Prev / Next on the
+        // phone appeared to "do nothing" while the details page was on screen. The fields
+        // below let this page follow the same document, exactly like the visualizer does.
+        this.lastStateProductId = null; // last product_id observed in api/state.php
+        this.syncInFlight = false;      // guard so slow polls cannot stack up
+        this.syncTimer = null;          // setInterval handle
+        this.loadingFor = null;         // id currently being fetched
+        this.loadToken = 0;             // incremented per load, discards stale responses
+
         this.init();
     }
 
@@ -16,8 +29,9 @@ class ProductViewer {
         // No longer show error if productId is null, just proceed to load
         // The loadProduct method will handle fetching the latest if ID is missing
         console.log("Initializing ProductViewer. Product ID from URL:", this.productId);
-        this.loadProduct();
+        this.loadProduct(this.productId);
         this.setupEventListeners();
+        this.startStateSync();
     }
 
     getProductIdFromUrl() {
@@ -38,15 +52,131 @@ class ProductViewer {
         return (parsedId && parsedId > 0) ? parsedId.toString() : null;
     }
 
-    async loadProduct() {
+    // =========================================================================
+    // Shared-state sync (Android remote -> this page)
+    // =========================================================================
+
+    /**
+     * Poll api/state.php and follow the product the remote is showing.
+     *
+     * The visualizer page has always done this; the details page did not, so pressing
+     * Prev / Next on the phone changed `state.product_id` and only the visualizer moved.
+     * Polling (1 s, same document, no new channel) keeps the two pages consistent.
+     */
+    startStateSync() {
+        this.syncOnce();
+        this.syncTimer = setInterval(() => {
+            if (!document.hidden) this.syncOnce();
+        }, 1000);
+
+        // Catch up immediately when the tab becomes visible again.
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) this.syncOnce();
+        });
+    }
+
+    /**
+     * One read of the shared state.
+     */
+    async syncOnce() {
+        if (this.syncInFlight) return;
+        this.syncInFlight = true;
+
         try {
-            this.showLoading();
+            let state;
+            try {
+                const response = await fetch("api/state.php", {
+                    method: "GET",
+                    headers: { "Accept": "application/json" },
+                    cache: "no-store",
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                state = await response.json();
+            } catch (error) {
+                // An unreachable API must not break the page: the ?id= product stays on screen.
+                console.warn("state.php unavailable, keeping the product on screen:", error.message);
+                return;
+            }
+
+            this.applyState(state);
+        } finally {
+            this.syncInFlight = false;
+        }
+    }
+
+    /**
+     * Apply a state document to this page.
+     *
+     * Reacts to *changes* of `state.product_id`, not to its absolute value: a page opened
+     * from a shared ?id= link keeps that product until the remote actually presses
+     * Prev / Next, at which point the value changes and this page follows.
+     */
+    applyState(state) {
+        if (!state || typeof state !== "object") return;
+
+        const incoming = (state.product_id != null) ? String(state.product_id) : null;
+        if (!incoming || !/^\d+$/.test(incoming)) return;
+
+        if (this.lastStateProductId === null) {
+            // First read in this session: adopt whatever the presentation is showing as the
+            // baseline instead of acting on it (a stale command must never hijack a deep link).
+            this.lastStateProductId = incoming;
+            if (!this.initialProductId && incoming !== this.currentProductId) {
+                // Opened without ?id=: there is no product of our own, so show the remote's.
+                this.loadProduct(incoming);
+            }
+            return;
+        }
+
+        if (incoming === this.lastStateProductId) return; // nothing changed
+        this.lastStateProductId = incoming;
+
+        if (incoming === this.currentProductId) return;  // already on screen
+        // The remote's nav command and this poll can name the same product in the same
+        // second; without this guard the page would fetch it twice.
+        if (this.loadingFor === incoming) return;
+        console.log(`Remote switched the product to ${incoming}; updating this page.`);
+        this.loadProduct(incoming);
+    }
+
+    /**
+     * Show a product by id without a page reload. Used by pc_remote_nav.js so tapping
+     * "Details" for a different product on an already-open details page swaps in place.
+     *
+     * @param {string|number} productId
+     * @returns {boolean} true when the request was valid
+     */
+    showProduct(productId) {
+        if (productId === null || productId === undefined) return false;
+        const target = String(productId).trim();
+        if (!/^\d+$/.test(target) || parseInt(target, 10) <= 0) return false;
+        if (target === this.currentProductId) return true;
+        this.loadProduct(target);
+        return true;
+    }
+
+    async loadProduct(productId) {
+        // Accept an explicit id so the state sync can swap products without a page reload.
+        const requestedId = (productId != null && String(productId) !== "")
+            ? String(productId)
+            : this.productId;
+
+        // Every load gets a token: if the remote skips several products quickly, only the
+        // newest response is allowed to paint, so a slow reply cannot overwrite a newer one.
+        const token = ++this.loadToken;
+
+        try {
+            // Only blank the page for the very first paint. A Prev / Next from the remote
+            // should swap the product in place instead of flashing the spinner.
+            if (!this.currentProductId) this.showLoading();
+
+            this.loadingFor = requestedId;
 
             // Construct API URL: Fetch specific ID or latest if ID is null/invalid
             let apiUrl = "get_product.php";
-            if (this.productId) {
-                apiUrl += `?id=${this.productId}`;
-                console.log(`Fetching specific product with ID: ${this.productId}`);
+            if (requestedId) {
+                apiUrl += `?id=${encodeURIComponent(requestedId)}`;
+                console.log(`Fetching specific product with ID: ${requestedId}`);
             } else {
                 console.log("No product ID in URL. Fetching the latest product.");
                 // No ID parameter needed, backend handles this
@@ -86,6 +216,9 @@ class ProductViewer {
             const data = await response.json();
             console.log("Received data:", data);
 
+            // A newer load started while this request was in flight: drop this result.
+            if (token !== this.loadToken) return;
+
             if (!data || !data.success || !data.product) {
                 throw new Error(
                     data.error ||
@@ -94,21 +227,38 @@ class ProductViewer {
             }
 
             this.productData = data;
-            // If we fetched the latest, update the URL for clarity/bookmarking (optional)
-            if (!this.productId && data.product && data.product.id) {
-                this.productId = data.product.id.toString(); // Store the actual ID loaded
-                // Update URL without reloading page
-                const newUrl = `${window.location.pathname}?id=${this.productId}${window.location.hash}`;
-                window.history.replaceState({ path: newUrl }, '', newUrl);
-                console.log(`Loaded latest product (ID: ${this.productId}). URL updated.`);
+
+            // Remember which product is actually on screen (also used by pc_remote_nav.js).
+            this.currentProductId = (data.product.id != null)
+                ? String(data.product.id)
+                : (requestedId || null);
+            this.productId = this.currentProductId;
+
+            if (this.currentProductId) {
+                // Keep the address bar in step so Share / refresh / Back all describe the
+                // product being shown. replaceState never adds a history entry.
+                const desiredSearch = `?id=${this.currentProductId}`;
+                if (window.location.search !== desiredSearch) {
+                    const newUrl = `${window.location.pathname}${desiredSearch}${window.location.hash}`;
+                    window.history.replaceState({ path: newUrl }, "", newUrl);
+                }
             }
-            
+
+            // Make sure the "Product Not Found" panel is not covering a good render.
+            const errorContainer = document.getElementById("error-message");
+            if (errorContainer && errorContainer.style.display === "flex") {
+                errorContainer.style.display = "none";
+            }
+
             this.renderProduct();
 
         } catch (error) {
+            // A superseded request must not paint an error over the product that replaced it.
+            if (token !== this.loadToken) return;
             console.error("Error loading product:", error);
             this.showError(`Failed to load product details. ${error.message}`);
         } finally {
+            if (token === this.loadToken) this.loadingFor = null;
             // Ensure loading is hidden unless an error is explicitly shown.
             if (document.getElementById("error-message").style.display !== "flex") {
                 this.hideLoading();
@@ -127,6 +277,10 @@ class ProductViewer {
         const productImage = document.getElementById("product-image");
         const imagePath = `uploads/products/${product.image}`;
         console.log("Setting product image path:", imagePath);
+        // Drop any zoom left over from the previous product so the swap starts clean.
+        this.isZoomMode = false;
+        this.currentScale = 1;
+        productImage.style.transform = "";
         productImage.src = imagePath;
         productImage.alt = product.name || "Product Image";
 
@@ -453,13 +607,20 @@ class ProductViewer {
 
     escapeHtml(unsafe) {
         if (unsafe === null || unsafe === undefined) return '';
+        // Entities are assembled from their pieces so no editor/transfer step can turn
+        // these literals back into the characters they are supposed to escape.
+        const AMP = "&" + "amp;";
+        const LT = "&" + "lt;";
+        const GT = "&" + "gt;";
+        const QUOT = "&" + "quot;";
+        const APOS = "&" + "#039;";
         return unsafe
             .toString()
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
+            .replace(/&/g, AMP)
+            .replace(/</g, LT)
+            .replace(/>/g, GT)
+            .replace(/"/g, QUOT)
+            .replace(/'/g, APOS);
     }
     
     // Placeholder for marking creation if needed based on background data
@@ -522,5 +683,7 @@ function redirectToProductViz() {
 document.addEventListener("DOMContentLoaded", () => {
     // Create an instance and optionally store it globally if needed by onclick handlers
     window.productViewerInstance = new ProductViewer();
+    // pc_remote_nav.js looks for `window.pvViewer` (same name the visualizer uses) so it
+    // can swap the product in place instead of reloading this page.
+    window.pvViewer = window.productViewerInstance;
 });
-

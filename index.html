@@ -4,27 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Product Placement Visualizer</title>
-    <!-- Link to the NEW stylesheet -->
-    <link rel="stylesheet" href="css/style.css">
+    <!-- ?v= busts stale caches: a cached old script referenced the removed
+         #warning-modal and threw, which killed every event handler. -->
+    <link rel="stylesheet" href="css/style.css?v=20261114c">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
-<!--
-    └── product_presenter/                 
-      ├── index.html
-      ├── js/
-      │   ├── script.js 
-          ├── ruler.js 
-          ├── product_detail_modal.js 
-      │ 
-      ├── api/
-      │   ├── background.php    
-      │   ├── config.php
-      │   ├── procucts.php
-
-      └── css/
-          └── style  --> 
 <body>
-    <!-- The main application container that controls the overall layout -->
     <div class="app-container">
 
         <!-- ============================================= -->
@@ -36,10 +21,10 @@
                 <h1>Product Placement Visualizer</h1>
             </div>
             <div class="header-actions">
-                 <a id="single-product-btn" 
-                    title="Single Product View" 
-                    href="individual-product.html"
-                    class="button-link">
+                <a id="single-product-btn"
+                   title="Single Product View"
+                   href="individual-product.html"
+                   class="button-link">
                     <i class="fas fa-square"></i> Single Product
                 </a>
                 <button id="fullscreen-toggle" title="Enter Fullscreen Presentation (F)">
@@ -71,18 +56,35 @@
                     </div>
                 </div>
 
-                <!-- Products Section -->
+                <!-- Products Section: per-background assignment -->
                 <div class="panel-section">
                     <div class="panel-header">
-                        <h2>Products</h2>
-                        <button id="upload-product-btn" title="Upload Product for Selected Background" class="action-button-sm">
+                        <h2 id="products-heading">Products</h2>
+                        <button id="upload-product-btn" title="Upload a new product" class="action-button-sm">
                             <i class="fas fa-upload"></i> Upload
                         </button>
                     </div>
-                    <div class="thumbnails-container product-gallery-wrapper" id="product-gallery-wrapper">
-                         <div class="product-gallery" id="product-gallery">
-                            <!-- Product thumbnails will be added here -->
-                         </div>
+                    <p class="panel-hint" id="products-hint">Select a background, then tick the products that belong to it.</p>
+                    <div class="thumbnails-container" id="product-assignment">
+                        <div class="assign-empty">No background selected.</div>
+                    </div>
+
+                    <!-- Product image fit controls (automatic, non-blocking) -->
+                    <div class="fit-controls" id="fit-controls">
+                        <h3>Image Fit</h3>
+                        <div class="control-group full-width">
+                            <label for="fit-mode">Fit mode</label>
+                            <select id="fit-mode">
+                                <option value="contain" selected>Contain (no distortion, padded)</option>
+                                <option value="cover">Cover (fills area, crops)</option>
+                                <option value="stretch">Stretch (may distort)</option>
+                            </select>
+                        </div>
+                        <div class="control-group full-width fit-checkbox-row">
+                            <input type="checkbox" id="remove-background" style="width:16px;height:16px;cursor:pointer;">
+                            <label for="remove-background" style="margin:0;cursor:pointer;">Remove background</label>
+                        </div>
+                        <p class="panel-hint" id="fit-hint">Images are auto-trimmed and fitted to the marking area on upload.</p>
                     </div>
                 </div>
             </aside>
@@ -92,33 +94,30 @@
             <!-- ============================================= -->
             <div class="panel center-panel">
                 <div id="presentation-wrapper">
-                    <div class="scene-container">
-                        <div class="ruler ruler-h"></div>
-                        <div class="ruler ruler-v"></div>
-                        <div class="scene-content-wrapper" id="scene-content">
-                            <img src="" alt="Select a background to begin" id="scene-background">
-                            <div id="marking-area" class="marking-area">
-                                <!-- JS adds resize handles here -->
-                            </div>
-                            <img src="" alt="Selected Product" id="inserted-product" style="display: none;">
-                            
-                            <!-- Fullscreen Navigation (remains hidden until fullscreen) -->
-                            <div class="fullscreen-controls">
-                                <button id="prev-product-btn" class="nav-button left" title="Previous Product (Left Arrow)"><i class="fas fa-chevron-left"></i></button>
-                                <button id="next-product-btn" class="nav-button right" title="Next Product (Right Arrow)"><i class="fas fa-chevron-right"></i></button>
-                                <div id="fullscreen-toolbar">
-                                    <button id="fullscreen-help-btn" class="toolbar-button" title="Keyboard Shortcuts (H)"><i class="fas fa-keyboard"></i></button>
-                                    <button id="product-info-btn" class="toolbar-button" title="Toggle Product Info (I)"><i class="fas fa-info-circle"></i></button>
-                                </div>
-                            </div>
-                            
-                            <div id="product-info-overlay" class="product-info-overlay">
-                                <h3 id="product-info-title">Product Name</h3>
-                                <p id="product-info-desc">Product description will appear here.</p>
-                            </div>
+                    <!--
+                        The single shared stage. js/pv_render.js builds the
+                        background + product boxes here with the SAME code the
+                        fullscreen viewer uses, so what you position is exactly
+                        what the customer sees.
+                    -->
+                    <div id="pv-host" class="pv-host pv-editor"></div>
+
+                    <!-- Fullscreen Navigation (hidden until fullscreen) -->
+                    <div class="fullscreen-controls">
+                        <button id="prev-product-btn" class="nav-button left" title="Previous Product (Left Arrow)"><i class="fas fa-chevron-left"></i></button>
+                        <button id="next-product-btn" class="nav-button right" title="Next Product (Right Arrow)"><i class="fas fa-chevron-right"></i></button>
+                        <div id="fullscreen-toolbar">
+                            <button id="fullscreen-help-btn" class="toolbar-button" title="Keyboard Shortcuts (H)"><i class="fas fa-keyboard"></i></button>
+                            <button id="product-info-btn" class="toolbar-button" title="Toggle Product Info (I)"><i class="fas fa-info-circle"></i></button>
                         </div>
                     </div>
+
+                    <div id="product-info-overlay" class="product-info-overlay">
+                        <h3 id="product-info-title">Product Name</h3>
+                        <p id="product-info-desc">Product description will appear here.</p>
+                    </div>
                 </div>
+                <div class="stage-meta" id="stage-meta">No background selected</div>
             </div>
 
             <!-- ============================================= -->
@@ -127,6 +126,7 @@
             <aside class="panel right-panel">
                 <div class="marking-controls" id="marking-controls">
                     <h3><i class="fas fa-drafting-compass"></i> Marking Area</h3>
+                    <p class="panel-hint" id="editor-selection-hint">No product selected.</p>
                     <div class="control-grid">
                         <div class="control-group">
                             <label for="marking-left">X (%)</label>
@@ -144,10 +144,14 @@
                             <label for="marking-height">H (%)</label>
                             <input type="number" id="marking-height" min="1" step="0.1" value="60">
                         </div>
-                         <div class="control-group full-width">
+                        <div class="control-group full-width">
                             <label for="marking-padding">Padding (%)</label>
                             <input type="number" id="marking-padding" min="0" step="0.1" value="0">
                         </div>
+                    </div>
+                    <div class="control-group full-width" style="flex-direction: row; align-items: center; gap: 8px; margin-bottom: 12px;">
+                        <input type="checkbox" id="lock-aspect" checked style="width:16px;height:16px;cursor:pointer;">
+                        <label for="lock-aspect" style="margin:0;cursor:pointer;">Lock product aspect ratio while resizing</label>
                     </div>
                     <div class="measurement-display">
                         <i class="fas fa-ruler"></i>
@@ -155,6 +159,9 @@
                     </div>
                     <button id="save-marking-btn" class="action-button">
                         <i class="fas fa-save"></i> Save Changes
+                    </button>
+                    <button id="remove-from-background-btn" class="action-button secondary" title="Remove this product from the current background">
+                        <i class="fas fa-unlink"></i> Remove from this background
                     </button>
                     <button id="add-product-detail-btn" class="action-button secondary">
                         <i class="fas fa-plus"></i> Add Product Detail
@@ -165,22 +172,10 @@
     </div>
 
     <!-- ============================================= -->
-    <!-- Modals & Hidden Inputs (Unchanged)            -->
+    <!-- Modals & Hidden Inputs                         -->
     <!-- ============================================= -->
-    <input type="file" id="background-upload" accept="image/jpeg, image/png" style="display: none;">
-    <input type="file" id="product-upload" accept="image/jpeg, image/png" style="display: none;">
-
-    <div id="warning-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal">×</span>
-            <h3><i class="fas fa-exclamation-triangle"></i> Image Warning</h3>
-            <p id="warning-message"></p>
-            <div class="modal-buttons">
-                <button id="resize-image-btn" class="action-button">Resize Image</button>
-                <button id="cancel-upload-btn" class="action-button secondary">Cancel</button>
-            </div>
-        </div>
-    </div>
+    <input type="file" id="background-upload" accept="image/jpeg,image/png,image/webp" style="display: none;">
+    <input type="file" id="product-upload" accept="image/jpeg,image/png,image/webp" style="display: none;">
 
     <div id="background-setup-modal" class="modal">
         <div class="modal-content">
@@ -188,23 +183,23 @@
             <h3><i class="fas fa-image"></i> New Background Setup</h3>
             <label for="background-name">Background Name:</label>
             <input type="text" id="background-name" placeholder="e.g., Bedroom, Office, etc.">
-            <p class="modal-instruction">Adjust the red marking area on the main screen, then save.</p>
+            <p class="modal-instruction">The background is added automatically. You can then assign products and position them.</p>
             <div class="modal-buttons">
-                <button id="confirm-background-btn" class="action-button"><i class="fas fa-check"></i> Confirm & Save</button>
+                <button id="confirm-background-btn" class="action-button"><i class="fas fa-check"></i> Upload Background</button>
                 <button id="cancel-background-btn" class="action-button secondary"><i class="fas fa-times"></i> Cancel</button>
             </div>
         </div>
     </div>
-    
+
     <div id="keyboard-shortcuts-modal" class="modal">
         <div class="modal-content">
             <span class="close-modal">×</span>
             <h3><i class="fas fa-keyboard"></i> Keyboard Shortcuts (Fullscreen Mode)</h3>
             <div class="shortcuts-list">
-                <div class="shortcut-item"><span class="key">↑</span><span class="description">Previous Background (with same product)</span></div>
-                <div class="shortcut-item"><span class="key">↓</span><span class="description">Next Background (with same product)</span></div>
                 <div class="shortcut-item"><span class="key">←</span><span class="description">Previous Product</span></div>
                 <div class="shortcut-item"><span class="key">→</span><span class="description">Next Product</span></div>
+                <div class="shortcut-item"><span class="key">↑</span><span class="description">Previous Background</span></div>
+                <div class="shortcut-item"><span class="key">↓</span><span class="description">Next Background</span></div>
                 <div class="shortcut-item"><span class="key">I</span><span class="description">Toggle Product Info</span></div>
                 <div class="shortcut-item"><span class="key">H</span><span class="description">Show/Hide This Help</span></div>
                 <div class="shortcut-item"><span class="key">Esc</span><span class="description">Close Overlay / Exit Fullscreen</span></div>
@@ -217,7 +212,7 @@
         <div class="modal-content product-detail-modal-content">
             <span class="close-modal">×</span>
             <h3><i class="fas fa-plus-circle"></i> Add Product Detail</h3>
-            
+
             <form id="productDetailForm">
                 <div class="form-group">
                     <label for="product_id">Product ID:</label>
@@ -268,18 +263,19 @@
                     <button type="submit" class="action-button">
                         <i class="fas fa-plus"></i> Add Detail
                     </button>
-                    <!-- <button type="button" class="action-button secondary" id="cancel-product-detail-btn">
-                        <i class="fas fa-times"></i> Cancel
-                    </button> -->
                 </div>
             </form>
-            
+
             <div id="product-detail-message" class="message" style="display:none;"></div>
         </div>
     </div>
 
-    <script src="js/script.js"></script>
-    <script src="js/ruler.js"></script>
-    <script src="js/product_detail_modal.js"></script>
+    <!-- Client-side image pipeline (Canvas API, no dependencies) -->
+    <script src="js/image_processor.js?v=20261114c"></script>
+    <!-- Placement renderer must load before the editor script -->
+    <script src="js/pv_render.js?v=20261114c"></script>
+    <script src="js/script.js?v=20261114c"></script>
+    <!-- Keeps the existing "Add Product Detail" modal working -->
+    <script src="js/product_detail_modal.js?v=20261114c"></script>
 </body>
 </html>

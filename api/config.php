@@ -71,7 +71,11 @@ if (!defined('PV_TOKEN')) {
 define('UPLOADS_DIR', __DIR__ . '/../uploads'); // Absolute path to uploads directory
 define('BACKGROUND_UPLOADS_DIR', UPLOADS_DIR . '/backgrounds');
 define('PRODUCT_UPLOADS_DIR', UPLOADS_DIR . '/products');
-define('BASE_URL', (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://" . $_SERVER['HTTP_HOST']);
+// CLI-safe: background migration scripts run without an HTTP_HOST. Fall back to
+// the LAN host used by the app so image URLs stay absolute either way.
+$pvHttpHost = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'localhost';
+$pvScheme   = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+define('BASE_URL', $pvScheme . '://' . $pvHttpHost);
 define('UPLOADS_BASE_URL', BASE_URL . '/product_presenter/uploads'); // Base URL for accessing uploads
 
 // Ensure upload directories exist
@@ -105,6 +109,11 @@ try {
 function send_json_response($data, $statusCode = 200) {
     http_response_code($statusCode);
     header('Content-Type: application/json');
+    // Never let a browser or proxy cache an API payload: a stale list would
+    // make a freshly uploaded background/product look like it vanished.
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
     echo json_encode($data);
     exit;
 }

@@ -1,0 +1,27 @@
+# /api/v1 front controller
+#
+# Gives the mobile app clean, stable URLs:
+#   GET  /api/v1/backgrounds
+#   GET  /api/v1/backgrounds/{id}/products
+#   GET  /api/v1/products/{id}
+#   POST /api/v1/backgrounds/{id}/products              (assign / upsert placement)
+#   PUT  /api/v1/backgrounds/{id}/products/{productId}  (update placement)
+#   DELETE /api/v1/backgrounds/{id}/products/{productId}(unassign)
+#
+# If mod_rewrite is unavailable the same routes still work as
+#   /api/v1/index.php/backgrounds/1/products
+# which is why index.php also reads PATH_INFO directly.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # Rewrite everything that is not a real file/dir onto index.php, keeping the
+    # original path available as PATH_INFO.
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php/$1 [L,QSA]
+</IfModule>
+
+# Never let the API be cached by intermediaries.
+<IfModule mod_headers.c>
+    Header set Cache-Control "no-store, max-age=0"
+</IfModule>

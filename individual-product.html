@@ -248,12 +248,15 @@
             <img id="modal-image" src="" alt="Product Image">
         </div>
     </div>
-    <script src="js/product_viewer.js"></script>
+    <!-- ?v=2: this page now FOLLOWS api/state.php, so Prev / Next on the phone swaps the
+         product in place instead of being ignored. The version query makes an already-open
+         PC pick up the new script on the next normal reload (no Ctrl+F5 needed). -->
+    <script src="js/product_viewer.js?v=2"></script>
     <script src="js/product_search.js"></script>
     <!-- PC-side listener for the Android remote: lets the phone send the display
          back to product_viz.html ("Visualize") and keeps the PC-presence
          heartbeat alive while this page is the one on screen. -->
-    <script src="js/pc_remote_nav.js"></script>
+    <script src="js/pc_remote_nav.js?v=2"></script>
     <script>
         // Logo Animation Overlay Script
         document.addEventListener('DOMContentLoaded', function() {

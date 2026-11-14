@@ -1,0 +1,22 @@
+# Raise PHP limits for image uploads.
+#
+# The WAMP default (upload_max_filesize = 2M) silently rejected every product
+# PNG the client-side pipeline produced, so a successfully processed image still
+# failed to save. These values are generous enough for real product photos.
+#
+# Wrapped in IfModule so the app keeps working on hosts that disallow
+# php_value in .htaccess (shared hosting with PHP-FPM, for example).
+
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 16M
+    php_value post_max_size 20M
+    php_value memory_limit 256M
+    php_value max_execution_time 120
+</IfModule>
+
+<IfModule mod_php.c>
+    php_value upload_max_filesize 16M
+    php_value post_max_size 20M
+    php_value memory_limit 256M
+    php_value max_execution_time 120
+</IfModule>

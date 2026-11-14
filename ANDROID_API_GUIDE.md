@@ -620,7 +620,43 @@ data class PresentationState(
 9. Re-open the PC browser → it loads cleanly and does **not** auto-jump (stale commands
    are ignored on a fresh session).
 
-### 8.8 Failure modes to expect
+### 8.8 UPDATE 2026-11-13 23:20 (+06:00) — the details page now follows the state too
+
+**Reported bug:** opening `individual-product.html?id=46` worked, but pressing **Prev** /
+**Next** on the phone did nothing on the PC while that page was on screen.
+
+**Cause (web side, now fixed):** `product_viz.html` followed `api/state.php` from the start,
+but `individual-product.html` loaded `?id=` once and then ignored every later change.
+
+**What changed (no API change required):**
+
+| File | Change |
+|---|---|
+| `js/product_viewer.js` | 1 s poll of `api/state.php`; swaps products in place when `state.product_id` changes; keeps `?id=` in the address bar via `replaceState`; exposes `window.pvViewer.showProduct(id)` |
+| `js/pc_remote_nav.js` | "Details" for a *different* product on an already-open details page now swaps in place instead of reloading the page |
+| `js/script.js` | the admin page's own Prev / Next (buttons + arrow keys) now POST `{"product_id": N}` so every display and the phone stay in step |
+| `individual-product.html`, `product_viz.html` | script tags carry `?v=2` so an already-open PC picks the fix up on its next normal reload |
+
+**Consequences for the app — the part that still needs app work:**
+
+1. **Prev / Next must POST `{"product_id": N}` on every press.** If the press only updates a
+   local list, the PC will not move. This is the whole fix from the app's side.
+2. **Bind "Now showing" to the `product_id` the server echoes back**, not to the value the
+   app intended to send. The response is the single source of truth.
+3. **Do not send `room` with a plain Prev / Next** unless the room really changes, otherwise
+   the PC bounces between rooms.
+4. **Details / Visualize keep sending `{"nav": {...}}`** — unchanged contract. On an
+   already-open details page the product now swaps with no reload, so no flash and no new
+   history entry is expected.
+
+Reply shape is unchanged:
+
+```
+POST api/state.php  {"product_id": 47}                    -> 200, rev + 1
+POST api/state.php  {"nav":{"target":"details","product_id":47}}  -> 200, nav_seq + 1
+```
+
+### 8.9 Failure modes to expect
 
 | Symptom | Cause | Fix |
 |---|---|---|

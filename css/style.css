@@ -562,3 +562,221 @@ body.fullscreen-active #exit-fullscreen-btn { display: flex; }
     border: 1px solid #fecaca;
 }
 
+/* ==========================================================================
+   SHARED SCENE STAGE (js/pv_render.js)
+   --------------------------------------------------------------------------
+   The stage is a box whose aspect ratio equals the background image. Products
+   are positioned inside it with percentage left/top/width/height, so the same
+   markup renders identically in the settings editor and in fullscreen.
+   These rules are editor-agnostic; only .pv-editor-* classes are decorative.
+   ========================================================================== */
+.pv-host {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+.pv-stage {
+    background-color: #000;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+.pv-stage-bg {
+    user-select: none;
+    -webkit-user-drag: none;
+}
+.pv-product-box {
+    /* left/top/width/height/padding/z-index are set inline by the renderer */
+    overflow: visible;
+}
+.pv-product-img {
+    user-select: none;
+    -webkit-user-drag: none;
+    pointer-events: none;
+}
+
+/* --- Editor-only chrome (never shown in fullscreen) ---------------------- */
+.pv-editor .pv-product-box {
+    outline: 2px solid var(--danger-color);
+    outline-offset: -2px;
+    background-color: rgba(239, 68, 68, 0.08);
+    cursor: move;
+}
+.pv-editor .pv-product-box.selected {
+    outline-color: var(--accent-primary);
+    background-color: rgba(59, 130, 246, 0.12);
+    z-index: 20 !important;
+}
+.pv-editor .pv-product-box:not(.selected) {
+    pointer-events: auto;
+    cursor: pointer;
+}
+body.fullscreen-active .pv-editor .pv-product-box {
+    outline: none !important;
+    background: transparent !important;
+}
+/* Hide all editor-only handles in the fullscreen presentation. */
+body.fullscreen-active .pv-resize-handle {
+    display: none !important;
+}
+
+/* Resize handles: only rendered by the editor for the selected box */
+.pv-resize-handle {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: #fff;
+    border: 2px solid var(--accent-primary);
+    border-radius: 2px;
+    z-index: 30;
+}
+.pv-resize-handle.nw { top: -6px; left: -6px; cursor: nwse-resize; }
+.pv-resize-handle.ne { top: -6px; right: -6px; cursor: nesw-resize; }
+.pv-resize-handle.sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+.pv-resize-handle.se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+
+/* Product assignment checklist in the left panel */
+.assign-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.assign-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+.assign-row:hover { background: #f9fafb; }
+.assign-row.is-selected { border-color: var(--accent-primary); background: rgba(59,130,246,0.06); }
+.assign-row.is-unassigned { opacity: 0.6; }
+.assign-row input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+.assign-thumb {
+    width: 34px; height: 44px; object-fit: contain; background: #f3f4f6;
+    border-radius: 4px; flex-shrink: 0;
+}
+.assign-meta { flex: 1; min-width: 0; }
+.assign-name {
+    font-size: 13px; font-weight: 600; color: var(--text-primary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.assign-sub { font-size: 11px; color: var(--text-secondary); }
+.assign-remove {
+    border: none; background: transparent; color: var(--danger-color);
+    cursor: pointer; font-size: 13px; padding: 4px;
+}
+.assign-empty { font-size: 12px; color: var(--text-secondary); padding: 8px; text-align: center; }
+.panel-hint { font-size: 12px; color: var(--text-secondary); margin: 0 0 10px 0; }
+
+/* --- Product image fit controls & processing spinner ------------------ */
+.fit-controls {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.fit-controls h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    margin: 0 0 8px 0;
+}
+
+.fit-controls select {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 13px;
+    background: #fff;
+    color: #111827;
+}
+
+.fit-checkbox-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 0 6px;
+}
+
+.assign-row.is-pending { opacity: 0.85; border-style: dashed; }
+
+.assign-thumb-pending {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.assign-thumb-pending img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    opacity: 0.55;
+}
+
+.assign-thumb-pending .assign-spinner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #3b82f6;
+    font-size: 14px;
+    background: rgba(243, 244, 246, 0.65);
+    border-radius: 4px;
+}
+
+/* ==========================================================================
+   CENTER PANEL LAYOUT for the shared stage
+   --------------------------------------------------------------------------
+   The middle column is a flex column: the presentation area grows to fill the
+   space, the small caption underneath keeps its natural height.
+   ========================================================================== */
+.center-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 16px;
+    min-width: 0; /* let the stage shrink instead of overflowing the grid */
+}
+#presentation-wrapper {
+    position: relative;
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;   /* critical: allows the inner host to shrink */
+    display: block;  /* pv-host fills it absolutely */
+}
+#pv-host {
+    position: absolute;
+    inset: 0;
+}
+.stage-meta {
+    flex: 0 0 auto;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+/* Editor outlines disappear in fullscreen because body.fullscreen-active drops
+   the .pv-editor styling (see the shared-stage block above). */
+body.fullscreen-active .center-panel {
+    padding: 0;
+    background-color: #000;
+}
+body.fullscreen-active #presentation-wrapper {
+    width: 100%;
+    height: 100%;
+}
+body.fullscreen-active .stage-meta {
+    display: none;
+}
+

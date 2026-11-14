@@ -130,6 +130,18 @@
         if (target === "details") {
             // Already showing this exact product's details: nothing to do.
             if (page === "individual-product.html" && urlId === id) return true;
+
+            // Already on the details page but for another product: swap the product in
+            // place. A full location.replace() here would reload the page, show the
+            // loading spinner and re-run this listener -- a visible flash for something
+            // that just means "show me the next product".
+            if (page === "individual-product.html" &&
+                window.pvViewer &&
+                typeof window.pvViewer.showProduct === "function" &&
+                window.pvViewer.showProduct(id)) {
+                return true;
+            }
+
             requestSkipLogoOverlay();
             window.location.replace("individual-product.html?id=" + encodeURIComponent(id));
             return true;

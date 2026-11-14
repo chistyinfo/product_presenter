@@ -200,13 +200,27 @@ function createBackground($pdo) {
 
     if (move_uploaded_file($file['tmp_name'], $uploadPath)) {
         try {
-            $sql = "INSERT INTO Backgrounds (name, image_filename, marking_top_percent, marking_left_percent,
+            // Record the natural pixel size so every client (web + Android) can
+            // reproduce the exact same geometry. NULL is tolerated; v1 reads it
+            // from the file on demand when it is missing.
+            $image_width = null;
+            $image_height = null;
+            $size = @getimagesize($uploadPath);
+            if ($size !== false && !empty($size[0]) && !empty($size[1])) {
+                $image_width = (int) $size[0];
+                $image_height = (int) $size[1];
+            }
+
+            $sql = "INSERT INTO Backgrounds (name, image_filename, image_width, image_height,
+                    marking_top_percent, marking_left_percent,
                     marking_width_percent, marking_height_percent, marking_padding_percent)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)";
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
             $stmt = $pdo->prepare($sql);
             $stmt->execute(array(
                 $name,
                 $image_filename,
+                $image_width,
+                $image_height,
                 $marking_top_percent,
                 $marking_left_percent,
                 $marking_width_percent,
@@ -311,20 +325,65 @@ function deleteBackground($pdo, $background_id) {
         }
         $background_image_filename = $background['image_filename'];
 
-        // 2. Get associated product image filenames
-        $stmtProd = $pdo->prepare("SELECT image_filename FROM Products WHERE background_id = ?");
+        // 2. Decide what happens to the products that were placed here.
+        //
+        // In the per-background model a product may also live on OTHER
+        // backgrounds. Because products.background_id is a legacy NOT NULL FK
+        // with ON DELETE CASCADE, deleting this background would otherwise wipe
+        // any product that happens to share the room. To avoid that data loss:
+        //   - products ALSO assigned elsewhere  -> re-point their legacy
+        //     background_id to that other background so the cascade misses them
+        //   - products ONLY in this background  -> left to cascade (truly orphaned)
+        $sharedProducts = array();
+        $stmtShared = $pdo->prepare("
+            SELECT bp.product_id, MIN(other.background_id) AS rescue_bg
+            FROM background_products bp
+            JOIN background_products other
+                 ON other.product_id = bp.product_id
+                AND other.background_id <> bp.background_id
+                AND other.is_active = 1
+            WHERE bp.background_id = ?
+            GROUP BY bp.product_id
+        ");
+        $stmtShared->execute(array($background_id));
+        foreach ($stmtShared->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            if (!empty($row['rescue_bg'])) {
+                $sharedProducts[(int) $row['product_id']] = (int) $row['rescue_bg'];
+            }
+        }
+        if (!empty($sharedProducts)) {
+            $repoint = $pdo->prepare("UPDATE Products SET background_id = ? WHERE id = ?");
+            foreach ($sharedProducts as $pid => $rescueBg) {
+                $repoint->execute(array($rescueBg, $pid));
+            }
+        }
+
+        // 3. Only collect the image files of products that will actually be
+        //    removed (i.e. NOT shared). Shared products keep their files.
+        $stmtProd = $pdo->prepare("SELECT id, image_filename FROM Products WHERE background_id = ?");
         $stmtProd->execute(array($background_id));
         $products = $stmtProd->fetchAll(PDO::FETCH_ASSOC);
         foreach ($products as $product) {
+            if (isset($sharedProducts[(int) $product['id']])) {
+                continue; // rescuing this product; keep its file
+            }
             if (!empty($product['image_filename'])) {
                 $product_image_filenames[] = $product['image_filename'];
             }
         }
 
-        // 3. Delete associated products (if not handled by ON DELETE CASCADE, or for robustness)
-        // Note: If ON DELETE CASCADE is reliable, this explicit delete might be redundant but safe.
-        $deleteProductsStmt = $pdo->prepare("DELETE FROM Products WHERE background_id = ?");
-        $deleteProductsStmt->execute(array($background_id));
+        // 3b. Remove the product rows that live ONLY in this background.
+        //     background_products assignments for this background are removed
+        //     by ON DELETE CASCADE when the background row is deleted below.
+        $deleteOrphans = $pdo->prepare("
+            DELETE FROM Products
+            WHERE background_id = ?
+              AND id NOT IN (
+                  SELECT product_id FROM background_products
+                  WHERE background_id <> ? AND is_active = 1
+              )
+        ");
+        $deleteOrphans->execute(array($background_id, $background_id));
 
         // 4. Delete the background record
         $deleteBackgroundStmt = $pdo->prepare("DELETE FROM Backgrounds WHERE id = ?");

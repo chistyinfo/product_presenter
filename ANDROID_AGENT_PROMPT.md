@@ -1,7 +1,97 @@
 # Prompt for the Android Studio Agent — DoorSoft PV Remote
 
 **Paste everything below the line into the Android Studio AI agent.**
-Dated **2026-11-13 22:25 (+06:00)**. The web/server side is already deployed and verified; only the app changes are missing.
+Dated **2026-11-13 22:25 (+06:00)**, updated **2026-11-13 23:15 (+06:00)**.
+The web/server side is already deployed and verified; only the app changes are missing.
+
+> **READ SECTION 0 FIRST.** It is a *newer* fix than the rest of this document and it is the
+> one that makes the product details page actually follow the remote.
+
+---
+
+## 0. UPDATE 2 (2026-11-13 23:15) — Prev / Next must publish `product_id`, always
+
+### What was broken
+
+The PC has two pages and **both now follow `api/state.php`**:
+
+- `product_viz.html` — always did.
+- `individual-product.html?id=<id>` — **fixed today**. It now polls `api/state.php` every
+  second and swaps in the product named by `state.product_id`. It also accepts an in-place
+  `pvViewer.showProduct(id)` call.
+
+So the rule on the app side is simple and unforgiving:
+
+> **Every Prev / Next press must POST the new `product_id` to `api/state.php`, every time,
+> including when the press happens while the PC is showing the details page.**
+
+If a Prev / Next press only updates a local variable or a local list, the PC will not move.
+That is exactly the reported bug: `individual-product.html?id=46` loaded fine, but pressing
+**Prev** / **Next** on the phone changed nothing on the PC.
+
+### 0.1 What to verify / change in the app
+
+1. **Prev / Next must POST** — on every single press, no debounce that swallows repeats:
+
+```kotlin
+private fun sendProduct(productId: Int) {
+    lifecycleScope.launch {
+        try {
+            // Same endpoint, same shape the app already uses for the transform.
+            api.updateState(PV_TOKEN.takeIf { it.isNotBlank() }, mapOf("product_id" to productId))
+            // Nothing navigates. Both PC pages follow state.product_id on their own.
+        } catch (e: HttpException) {
+            if (e.code() == 409) toast("PC not connected") else toast("Failed to reach PC")
+        } catch (e: IOException) {
+            toast("PC not connected")
+        }
+    }
+}
+
+fun onNextClicked() { sendProduct(nextProductId()) }   // +1 with wraparound
+fun onPrevClicked() { sendProduct(prevProductId()) }   // -1 with wraparound
+```
+
+2. **Do not keep the "Now showing" label in a private list.** After every successful POST,
+   bind the label to the `product_id` the server echoes back in the response — not to the
+   value the app *intended* to send. The server is the single source of truth for both the
+   phone's label and the PC's screen.
+
+3. **`space` and `room` must stay out of a plain Prev / Next POST** unless the room genuinely
+   changes. Sending `room` with every press makes the PC bounce between rooms.
+
+4. **Details after Prev / Next must use the id the app is showing**, which is
+   `state.product_id` from the latest response (see section 2). Never reuse an id captured
+   when the Remote screen was opened.
+
+5. **Details on an already-open details page no longer needs a page load.** The PC swaps the
+   product in place, so the accepted behaviour is: no flash, no reload, no history entry.
+   Do not "fix" that by adding a query parameter or a reload.
+
+### 0.2 Why no new endpoint is needed
+
+The details page runs the same 1 s poll as the visualizer:
+
+```
+GET  api/state.php                          -> { rev, product_id, room, ... }
+POST api/state.php  {"product_id": 46}      -> bumps rev; both PC pages follow
+POST api/state.php  {"nav":{"target":"details","product_id":46}}  -> switches PAGE
+```
+
+- **Prev / Next** → `{"product_id": N}` only. The page on screen stays the same page.
+- **Details / Visualize** → `{"nav": {...}}` only. The page changes, the product does not.
+
+### 0.3 Acceptance tests for this fix
+
+| # | Action | Expected |
+|---|---|---|
+| 1 | PC on `individual-product.html?id=46`, phone shows 46 | both agree |
+| 2 | Press **Next** on the phone | within ~1 s the PC details page shows the next product; URL becomes `?id=<new>` via `replaceState`; **no reload, no spinner** |
+| 3 | Press **Prev** twice quickly | the PC ends on the correct product (only the newest response paints) |
+| 4 | Press **Next** while the PC is on `product_viz.html` | the visualizer swaps product, details page (if closed) is untouched |
+| 5 | Open `individual-product.html?id=46` by hand while the phone shows a different product, then press **Next** | the page follows the phone from that press onward (the deep link is not hijacked before it) |
+| 6 | Close the PC browser, wait ~10 s, press **Next** | toast "PC not connected", `rev` unchanged, nothing jumps later |
+| 7 | Press **Details** for the product already on screen | PC does not reload or flash |
 
 ---
 
