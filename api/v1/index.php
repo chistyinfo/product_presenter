@@ -586,6 +586,91 @@ if ($resource === 'backgrounds' && isset($segments[1]) && isset($segments[2])
 }
 
 // ---------------------------------------------------------------------------
+// DELETE /products/{id}  -> permanently delete a product (all backgrounds)
+// ---------------------------------------------------------------------------
+// Distinct from DELETE /backgrounds/{id}/products/{productId}, which only
+// unassigns one placement. This wipes the product itself: every placement on
+// every background, its detail/sticker rows and its image file.
+if ($resource === 'products' && isset($segments[1]) && !isset($segments[2]) && $method === 'DELETE') {
+
+    pv_check_optional_token();
+
+    $productId = (int) $segments[1];
+    if ($productId <= 0) {
+        pv_error(400, 'bad_request', 'A valid product id is required.');
+    }
+
+    // Read the image filename BEFORE deleting the row: it is needed to remove
+    // the file from disk after the transaction commits.
+    try {
+        $stmt = $pdo->prepare("SELECT id, name, image_filename FROM products WHERE id = ?");
+        $stmt->execute(array($productId));
+        $product = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        error_log('v1 delete product lookup: ' . $e->getMessage());
+        pv_error(500, 'server_error', 'Failed to load the product.');
+    }
+
+    if (!$product) {
+        pv_error(404, 'not_found', 'Product not found.');
+    }
+
+    // One transaction: links/placements, details and the product row are all
+    // removed atomically, so a failure leaves the product fully intact.
+    try {
+        $pdo->beginTransaction();
+
+        // 1. Detach from every background (all placements / links).
+        $stmt = $pdo->prepare("DELETE FROM background_products WHERE product_id = ?");
+        $stmt->execute(array($productId));
+
+        // 2. Detail / sticker rows. Tolerate a missing table on older installs
+        //    (the FK cascade on products would cover it anyway) without
+        //    aborting the surrounding transaction.
+        try {
+            $stmt = $pdo->prepare("DELETE FROM product_details WHERE product_id = ?");
+            $stmt->execute(array($productId));
+        } catch (PDOException $detailEx) {
+            error_log('v1 delete product details: ' . $detailEx->getMessage());
+        }
+
+        // 3. The product row itself.
+        $stmt = $pdo->prepare("DELETE FROM products WHERE id = ?");
+        $stmt->execute(array($productId));
+        if ($stmt->rowCount() === 0) {
+            $pdo->rollBack();
+            pv_error(404, 'not_found', 'Product not found.');
+        }
+
+        $pdo->commit();
+    } catch (PDOException $e) {
+        if ($pdo->inTransaction()) { $pdo->rollBack(); }
+        error_log('v1 delete product: ' . $e->getMessage());
+        pv_error(500, 'server_error', 'Failed to delete the product.');
+    }
+
+    // Remove the image file only after the DB is consistent. A missing file is
+    // not an error: the record (the source of truth) is already gone.
+    $fileDeleted = false;
+    if (!empty($product['image_filename']) && defined('PRODUCT_UPLOADS_DIR')) {
+        $path = PRODUCT_UPLOADS_DIR . '/' . $product['image_filename'];
+        if (is_file($path)) {
+            $fileDeleted = @unlink($path);
+            if (!$fileDeleted) {
+                error_log('v1 delete product: failed to unlink ' . $path);
+            }
+        }
+    }
+
+    pv_json(array(
+        'ok'            => true,
+        'message'       => 'Product deleted',
+        'product_id'    => $productId,
+        'image_deleted' => (bool) $fileDeleted,
+    ));
+}
+
+// ---------------------------------------------------------------------------
 // Nothing matched.
 // ---------------------------------------------------------------------------
 pv_error(404, 'not_found', 'Unknown API route. See API.md for the supported endpoints.');

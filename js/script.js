@@ -84,6 +84,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // writes for the same product, so the second cannot fail with a 404.
     const assignInFlight = new Set();
     const removalInFlight = new Set();
+    // Permanent deletes in flight, keyed by product id. Stops a double-click
+    // from firing two DELETEs (the second would 404).
+    const deleteInFlight = new Set();
 
     // Neutral Marking Area values (same as the markup defaults). The panel is
     // reset to these whenever nothing is selected, so a product that was just
@@ -436,6 +439,20 @@ document.addEventListener("DOMContentLoaded", () => {
                 row.appendChild(rm);
             }
 
+            // Permanent delete: removes the product from EVERY background (and
+            // deletes its image file). Distinct from the unlink above, which
+            // only detaches it from the current background.
+            const del = document.createElement("button");
+            del.className = "assign-delete";
+            del.title = "Delete product";
+            del.innerHTML = '<i class="fas fa-trash-alt"></i>';
+            del.onclick = async (ev) => {
+                // Do not toggle the row checkbox / re-select the row.
+                ev.stopPropagation();
+                await deleteProduct(prod);
+            };
+            row.appendChild(del);
+
             row.addEventListener("click", () => {
                 const pid = Number(prod.id);
                 // A removal for this product is running: ignore the click so it
@@ -539,6 +556,52 @@ document.addEventListener("DOMContentLoaded", () => {
         } finally {
             removalInFlight.delete(pid);
             updateEditorInputs();     // re-derive the button state
+        }
+    }
+
+    /**
+     * Permanently delete a product: removes it from every background, deletes
+     * its image file, and updates the list in place (no page reload). If the
+     * product was open in the Marking Area, the panel is cleared.
+     */
+    async function deleteProduct(prod) {
+        const pid = Number(prod.id);
+        if (!pid) return;
+        if (deleteInFlight.has(pid)) return;
+
+        const label = prod.name || ("#" + pid);
+        if (!confirm(`Delete product "${label}"? It will be removed from all backgrounds. This cannot be undone.`)) return;
+
+        deleteInFlight.add(pid);
+        try {
+            await fetchJson(`${API_V1}/products/${pid}`, { method: "DELETE" });
+
+            // Was it shown on the current background's stage? (needed below)
+            const wasAssigned = isAssigned(pid);
+            const wasSelected = Number(state.selectedProductId) === pid;
+
+            // Drop the product from local state.
+            state.catalog = state.catalog.filter(p => Number(p.id) !== pid);
+            state.assignments = state.assignments.filter(a => Number(a.product_id) !== pid);
+
+            // If it was open in the Marking Area, clear the selection.
+            if (wasSelected) state.selectedProductId = null;
+
+            // Remove the row from the list directly (no full reload).
+            const row = productAssignment.querySelector(
+                `.assign-row[data-product-id="${pid}"]`);
+            if (row) row.remove();
+
+            // Repaint the stage so a box for the deleted product disappears,
+            // and reset the Marking Area panel if it was editing this product.
+            if (wasAssigned) renderStage();
+            if (wasSelected) updateEditorInputs();
+
+            showToast("Product deleted");
+        } catch (e) {
+            showToast("Delete failed: " + e.message, true);
+        } finally {
+            deleteInFlight.delete(pid);
         }
     }
 
